@@ -1,3 +1,4 @@
-[submodule "tfm-library"]
-	path = tfm-library
-	url = {{TFM_LIBRARY_URL}}
+[submodule "vsc-library"]
+	path = vsc-library
+	url = https://github.com/andreasgoethals/VSC_Library.git
+	branch = main

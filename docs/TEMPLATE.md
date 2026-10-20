@@ -4,7 +4,7 @@ The structure and rules every one of my research repositories starts from.
 
     Author   Andreas Goethals <andreas.goethals@kuleuven.be>
     Context  PhD research, KU Leuven — machine learning on tabular data
-    Cluster  KU Leuven VSC (Genius login, wICE and Mindwell compute)
+    Cluster  KU Leuven VSC (wICE login service, wICE and Mindwell compute)
     Source   https://github.com/andreasgoethals/0.-Template
 
 **A starting point, not a contract.** A project that grows past it is fine, and deviating where
@@ -41,7 +41,7 @@ project-specific belongs in `README.md` or another `docs/` file, not here.
 │   │   ├── paths.py         every path in the project
 │   │   ├── clean_run.py     wipe the previous run
 │   │   ├── run_notebooks.py run every notebook, rebuild both summaries
-│   │   ├── update_tfm_library.py
+│   │   ├── update_library.py
 │   │   ├── logging_setup.py
 │   │   └── config.py        reading config/
 │   ├── visualize/
@@ -49,7 +49,7 @@ project-specific belongs in `README.md` or another `docs/` file, not here.
 │   │   └── figures.py       FigureSaver
 │   └── ...                  more as the project needs (train/, eval/, models/)
 ├── tests/
-├── tfm-library/             submodule: literature + VSC docs. READ-ONLY.
+├── vsc-library/             submodule: HPC/VSC guides and templates. READ-ONLY.
 ├── .vscode/settings.json
 ├── .gitattributes  .gitignore  .gitmodules
 ├── AGENTS.md                the rules for every agent
@@ -127,7 +127,7 @@ It ships empty. Filling it is the project's job.
 
 How **this** project runs on the KU Leuven VSC cluster: which partitions and walltime limits it
 uses, how to submit, how to resume a job that outlives the walltime, and how to get results back.
-Built from the VSC documentation in `tfm-library/`, but written about this project.
+Built from the VSC documentation in `vsc-library/`, but written about this project.
 
 **Storage — two tiers.** On both, everything lives inside a folder named after the project.
 
@@ -136,7 +136,7 @@ Built from the VSC documentation in `tfm-library/`, but written about this proje
 | **project storage** | `/lustre1/project/stg_00211/<Project>/` | big files: datasets, checkpoints, caches, **`output/results/`** |
 | **personal data** | `$VSC_DATA/<Project>/` | the repository, and the rest of `output/` |
 
-**Both are backed up.** They differ in size and in convenience: `$VSC_DATA` is only 75 GiB but you
+**Personal DATA is backed up; verify the allocation-specific project-storage protection policy.** They differ in size and in convenience: `$VSC_DATA` is only 75 GiB but you
 can browse it directly, while project storage is large but has to be pulled down locally first
 (PowerShell, `scp`/`rsync`) before you can look at anything in it. So the big, rarely-read things
 go to project storage and everything you actually want to open stays on `$VSC_DATA`. Project
@@ -272,12 +272,12 @@ everywhere — and then it is identical, so do not rewrite it.
   invocation, locally or on the cluster, and leaves the tracked `.gitkeep` markers so the next run
   has somewhere to write. `--processed` additionally clears `data/processed/`; that is opt-in
   because rebuilding the cache can cost far more than re-running the notebooks. `data/raw/`,
-  weights and `tfm-library/` are never touched.
+  weights and library submodules are never touched.
 - **`run_notebooks.py`** — *filled in.* `python -m src.utils.run_notebooks` runs every notebook in
   parallel, in separate processes (matplotlib's figure registry is global), then rebuilds
   `CAPTIONS.md` and `All_Results.md`. Notebooks are **discovered**, alphabetically — a hard-coded
   list silently stops covering a notebook someone added.
-- **`update_tfm_library.py`** — *filled in.* Bumps this project's submodule pin; see below.
+- **`update_library.py`** — *filled in.* Bumps this project's submodule pin; see below.
 - **`logging_setup.py`** — *filled in, minimal.* One logger, writing to the console **and** to
   `output/logs/`. On the cluster stdout is a SLURM file that moves on requeue; a log the code
   controls survives the job that produced it.
@@ -340,45 +340,73 @@ anything under `src/visualize/`.
 
 ---
 
-## `tfm-library/`
+## Shared library submodules
 
-The shared TFM literature, as a **pinned git submodule**. In every project.
+The template includes **VSC Library only**, at `vsc-library/`. Initialize it after cloning:
 
-**What it is.** One curated knowledge base: the papers as PDFs with full-text extractions,
-per-paper summaries, a cross-paper synthesis, flat-text snapshots of the upstream reference
-implementations, and the VSC documentation. Maintained in its own repository, consumed by all.
-
-**Why every project has it.** So a human *or an agent* can answer "what does the literature say?"
-and "how does the official code actually do this?" **from inside the repository, offline, by
-reading and grepping files** — no web search, no paywall, no recall from memory. It turns "I
-believe X" into "X, see `tfm-library/<path>`". That is the point.
-
-**Why a submodule.** It pins one exact commit, so a result stays reproducible against the
-literature *as it stood*, and every project shares one maintained copy instead of several drifting
-ones.
-
-**READ-ONLY, one exception.** Never create, edit, move or delete anything inside it — anything
-written there is lost when the pin moves, or corrupts a resource every project shares. The
-exception is `tfm-library/PROJECT_SPECIFIC.md`, which the library gitignores for exactly this
-purpose. If a library document is wrong, report it upstream rather than patching it here. Never
-lint, format or test it.
-
-**Citing it.** Papers by path (`tfm-library/papers/<year>/…`, full text under `papers/text/`).
-**Code dumps by symbol name, never by line number** — the dumps are re-snapshotted and line numbers
-drift by thousands. Record the pin next to any result that depends on the literature.
-
-**A repository carries a real gitlink**, not just `.gitmodules`: that file records a path and a
-URL, the gitlink (a tree entry of mode `160000`) records *which commit*. Without it,
-`git submodule update --init` does nothing.
-
-```
-git submodule update --init                    # after a clone; empty until you ask (~749 MB)
-git submodule status                           # which commit this project is pinned to
-python -m src.utils.update_tfm_library         # bump the pin; reports first, --update to move it
+```powershell
+git submodule update --init -- vsc-library
+git submodule status
 ```
 
-`git submodule update --remote` moves the working tree but does **not** record the pin — a leading
-`+` in `git submodule status` is that, not an error.
+Libraries are independent repositories. Add only those the project needs:
+
+| Library | Repository | Mountpoint |
+|---|---|---|
+| VSC infrastructure | [VSC Library](https://github.com/andreasgoethals/VSC_Library) | `vsc-library` |
+| Tabular foundation models (optional) | [TFM Library](https://github.com/andreasgoethals/TFM_Library) | `tfm-library` |
+| Decision models (optional) | [DM Library](https://github.com/andreasgoethals/DM_Library) | `decision-models-library` |
+
+For a project without VSC Library, this is the complete registration example:
+
+```powershell
+git submodule add -b main https://github.com/andreasgoethals/VSC_Library.git vsc-library
+git add -- .gitmodules vsc-library
+git commit -m "Add VSC Library reference"
+git push
+```
+
+Do not repeat `submodule add` when the path is already registered. For an optional
+library, substitute its repository URL and mountpoint from the table. Adding one
+library never installs the others. Keep added mountpoints excluded from packaging,
+linting and test discovery; the three paths above are already excluded here.
+
+The `.gitmodules` registration records the URL; the committed gitlink records the
+exact library revision. Read shared documents and snapshots in place, cite source
+paths and symbols, and record the pin beside results that depend on them.
+
+**Consumer copies are read-only.** Never edit, refresh, lint, format or test inside
+them. VSC has no local-file exception: put project-specific operations in
+`docs/VSC.md`. TFM and DM permit only their ignored `PROJECT_SPECIFIC.md`, created
+from their own `PROJECT_SPECIFIC.template.md`. Corrections belong in the canonical
+library checkout.
+
+The owner's canonical checkouts live together in the local `0. Literature`
+workspace. Its `scripts/maintain.py` runs each library's maintenance in parallel.
+After reviewing, committing and pushing library changes, run from that workspace:
+
+```powershell
+python scripts/propagate_to_downstream.py --dry-run
+python scripts/propagate_to_downstream.py --push
+```
+
+Propagation discovers existing consumers through their submodule URLs, including
+this template. It pins the exact clean published library commit, commits only the
+submodule path and optionally pushes. It never adds an unregistered library.
+A new consumer must be inside the searched Projects tree or supplied through
+`--root`. The template's daily Dependabot configuration proposes VSC pin updates
+on GitHub; proposals require review and merging.
+
+For a single consumer, the local helper reports the current pin by default:
+
+```powershell
+python -m src.utils.update_library
+python -m src.utils.update_library --library vsc-library --update --commit
+git push
+```
+
+Review the library changelog before updating. Publishing a library alone does not
+change a consumer's committed pin; run propagation or merge an update proposal.
 
 ---
 
@@ -392,13 +420,13 @@ python -m src.utils.update_tfm_library         # bump the pin; reports first, --
   A symlink also works, but not on Windows without Administrator rights, so the import is the
   portable form. Claude-specific instructions, if ever needed, go below the import.
 - **`AGENTS.md`** — the rules an agent follows here: follow this template and say when you deviate;
-  `tfm-library/` is read-only; never commit data or weights; never install, train or push without
+  library submodules are read-only; never commit data or weights; never install, train or push without
   asking; verify claims against a source rather than filling gaps plausibly; read
   `docs/AGENTS_MEMORY.md` first and add to it after a failure; Windows PowerShell 5.1 has no `&&`,
   so one command per line.
 - **`LICENSE`** — MIT in the author's name, plus a line stating that third-party material (the
   submodule, datasets, downloaded weights) keeps its own licence.
-- **`pyproject.toml`** — Python **3.11–3.12**, `ruff` and `pytest` in a `dev` extra, `tfm-library/`
+- **`pyproject.toml`** — Python **3.11–3.12**, `ruff` and `pytest` in a `dev` extra, library submodules
   excluded from ruff, pytest collection and the package. Every non-obvious pin says **why**.
 - **`.gitignore`** — never commit raw data, weights, caches, environments, tool caches or figures.
   **Anchor a rule with a leading slash** when a name should only match at the root: a bare
@@ -406,7 +434,7 @@ python -m src.utils.update_tfm_library         # bump the pin; reports first, --
 - **`.gitattributes`** — `* text=auto eol=lf`. The dev machine is Windows and every cluster job is
   Linux bash; a CRLF `.slurm` file fails with a bare `$'\r': command not found` that reads like a
   script bug and is not one.
-- **`.gitmodules`** — declares `tfm-library`.
+- **`.gitmodules`** — declares `vsc-library`; optional libraries are added explicitly.
 - **`.vscode/settings.json`** — committed, and not a preference: `python.analysis.extraPaths` is
   what lets an editor resolve `from src.utils…` given the flat `src/` package root, and
   `jupyter.notebookFileRoot` makes an interactive notebook run from the same directory as the

@@ -15,27 +15,19 @@ Instructions for AI agents working in this repository.
 **If a `_template/` folder still exists**, read [`_template/README.md`](_template/README.md)
 first: this is either the un-initialised template or a project where nobody deleted the folder.
 
-## 1. `tfm-library/` IS READ-ONLY. NO EXCEPTIONS BUT ONE.
+## 1. Shared library submodules are read-only
 
-A **pinned git submodule** holding the shared TFM literature. This repository does not track its
-contents.
+The template includes `vsc-library/`. Projects may independently opt into
+`tfm-library/`, `decision-models-library/`, or additional libraries. See
+[`docs/TEMPLATE.md`](docs/TEMPLATE.md#shared-library-submodules) for registration
+and update commands. Never assume all projects use all libraries.
 
-It is here so you can answer *"what does the literature say?"* and *"how does the official
-implementation do this?"* **by reading and grepping files in this repository** — offline, no web
-search, nothing from memory. Use it. A claim you can point at a path for beats a confident
-sentence.
-
-**Never create, edit, move, or delete anything inside it** — not a typo fix, not a note, not a
-reformat. Anything you write there is lost when the pin moves, or corrupts a resource every other
-project shares. **The one exception** is `tfm-library/PROJECT_SPECIFIC.md`, gitignored by the
-library for exactly this purpose and created from `PROJECT_SPECIFIC.template.md`. If a library
-document is wrong, report it to {{AUTHOR}} rather than patching it — the fix belongs in the
-library's own checkout, where it flows down to every consumer. Never lint, format or test it.
-
-Cite papers by path (`tfm-library/papers/<year>/...`, full text under `papers/text/`), and **code
-dumps by symbol name, never by line number** — the dumps are re-snapshotted and line numbers drift
-by thousands. Record the pin (`git submodule status`) next to any result that depends on it. Bump it with
-`python -m src.utils.update_tfm_library`.
+Read shared documents and implementation snapshots in place; cite source paths
+and symbols rather than snapshot line numbers, and record the pinned commit.
+Never edit, refresh, lint, format or test a consumer submodule. VSC has no
+exception: project operations belong in `docs/VSC.md`. TFM and DM permit only
+their ignored `PROJECT_SPECIFIC.md`, created from the library's template.
+Report shared corrections for the canonical checkout in `0. Literature`.
 
 ## 2. Never commit data or checkpoints
 
@@ -98,3 +90,12 @@ python -m pytest -q
 And `python -m src.utils.run_notebooks` if you touched a notebook or anything under
 `src/visualize/`. Nothing runs these for you — no CI, no hook — so run them before you claim
 anything is finished.
+
+## Shared VSC Library
+
+`vsc-library/` is a pinned, entirely read-only infrastructure submodule. Read its
+README, source snapshot, guides and Slurm examples; never edit, refresh, lint,
+format or test inside it. There is no PROJECT_SPECIFIC exception. Keep this
+project's VSC choices and operating instructions in `docs/VSC.md`, outside the
+submodule. Shared corrections belong in the standalone VSC Library checkout.
+Record the library pin when operational evidence depends on it.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 20-10-2026
+
+- Made VSC the only default library; removed the TFM registration, documented optional independent libraries and canonical propagation, and generalized the pin helper and initializer.
+
+- Added the independent read-only VSC Library submodule and daily pin-update proposals; shared HPC guidance moved out of TFM Library, with project instructions retained in docs/VSC.md. No cluster workload was submitted.
+
 What changed in this repository. **One chapter per date, `DD-MM-YYYY`, newest at the
 top.** Terse: what changed, and why if it is not obvious. All rules and rule changes are
 recorded here.

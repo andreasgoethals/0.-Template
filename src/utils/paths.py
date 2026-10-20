@@ -223,9 +223,11 @@ def notebooks_dir() -> Path:
     return REPO_ROOT / "notebooks"
 
 
-def library_dir() -> Path:
+def library_dir(name: str = "vsc-library") -> Path:
     """The read-only literature submodule. READ from it; never write inside it."""
-    return REPO_ROOT / "tfm-library"
+    if name not in {"vsc-library", "tfm-library", "decision-models-library"}:
+        raise ValueError(f"Unknown library mountpoint: {name}")
+    return REPO_ROOT / name
 
 
 def repo_dir_on_cluster() -> Path:

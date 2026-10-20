@@ -1,5 +1,11 @@
 # Agents' memory — runs and dead ends
 
+## 20-10-2026
+
+- Library maintenance now runs from the canonical `0. Literature` workspace. The template consumes only VSC; TFM and DM are optional. Consumer copies remain read-only.
+
+- Added the independent read-only VSC Library submodule and daily pin-update proposals; shared HPC guidance moved out of TFM Library, with project instructions retained in docs/VSC.md. No cluster workload was submitted.
+
 What is worth carrying between sessions: **the cluster runs that have been done**, and **the things
 that turned out not to work**. Read it before starting; add to it as you go.
 

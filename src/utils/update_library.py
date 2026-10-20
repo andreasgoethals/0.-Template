@@ -1,8 +1,8 @@
-"""Bump this project's `tfm-library/` pin. REPORTS BY DEFAULT — changes nothing.
+"""Bump this project's `vsc-library/` pin. REPORTS BY DEFAULT — changes nothing.
 
-    python -m src.utils.update_tfm_library                     what is pinned vs upstream
-    python -m src.utils.update_tfm_library --update             fetch and move the working tree
-    python -m src.utils.update_tfm_library --update --commit    ...and record the new pin
+    python -m src.utils.update_library                     what is pinned vs upstream
+    python -m src.utils.update_library --update             fetch and move the working tree
+    python -m src.utils.update_library --update --commit    ...and record the new pin
 
 WHY THREE STEPS AND NOT ONE: `git submodule update --remote` moves the working tree but
 does NOT record the new pin — `git submodule status` then shows a leading `+`, which looks
@@ -10,10 +10,10 @@ like an error and is not. The pin only changes once the submodule path is added 
 committed. Doing that silently would move the literature a result was checked against
 without saying so, which is exactly the thing a pinned submodule exists to prevent.
 
-READ `tfm-library/CHANGELOG.md` BEFORE BUMPING. The point of the pin is that a result is
+READ `vsc-library/CHANGELOG.md` BEFORE BUMPING. The point of the pin is that a result is
 reproducible against the literature as it stood; moving it is a decision, not maintenance.
 
-NOTHING INSIDE `tfm-library/` IS EVER WRITTEN by this script. It only moves which commit
+NOTHING INSIDE `vsc-library/` IS EVER WRITTEN by this script. It only moves which commit
 the submodule points at.
 """
 
@@ -23,9 +23,9 @@ import argparse
 import subprocess
 from pathlib import Path
 
-#: `parents[2]` because this file is `<root>/src/utils/update_tfm_library.py`.
+#: `parents[2]` because this file is `<root>/src/utils/update_library.py`.
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SUBMODULE = "tfm-library"
+SUBMODULE = "vsc-library"
 
 
 def git(*args: str, check: bool = True) -> str:
@@ -52,7 +52,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--update", action="store_true", help="fetch and move the working tree")
     parser.add_argument("--commit", action="store_true", help="record the new pin (needs --update)")
+    parser.add_argument("--library", default="vsc-library",
+                        choices=["vsc-library", "tfm-library", "decision-models-library"])
     args = parser.parse_args(argv)
+    global SUBMODULE
+    SUBMODULE = args.library
+    if args.commit and not args.update:
+        parser.error("--commit requires --update")
+    if not git("ls-files", "-s", "--", SUBMODULE).startswith("160000"):
+        print(f"{SUBMODULE} is not registered. See docs/TEMPLATE.md.")
+        return 1
+    if args.update:
+        if git("diff", "HEAD", "--", ".gitmodules"):
+            raise RuntimeError("Publish pending submodule registrations first")
+        if git("diff", "--cached", "--", SUBMODULE):
+            raise RuntimeError("Preserve the already-staged submodule pin")
+        result = subprocess.run(["git", "-C", str(REPO_ROOT / SUBMODULE),
+                                 "status", "--porcelain"], capture_output=True, text=True)
+        if result.returncode or result.stdout.strip():
+            raise RuntimeError("Initialize the submodule and preserve its local changes first")
 
     if not (REPO_ROOT / SUBMODULE).exists():
         print(f"{SUBMODULE}/ is missing. Add it with:")
@@ -83,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
             "\nThe working tree moved but THE PIN IS NOT RECORDED — the leading `+` above is\n"
             "that, not an error. To record it:\n"
             f"  git add {SUBMODULE}\n"
-            '  git commit -m "Bump tfm-library pin"'
+            '  git commit -m "Bump vsc-library pin"'
         )
         return 0
 
@@ -91,9 +109,9 @@ def main(argv: list[str] | None = None) -> int:
         print("\nAlready up to date — nothing to commit.")
         return 0
     git("add", SUBMODULE)
-    # The `-- tfm-library` pathspec is not cosmetic: a bare `git commit` would sweep in
+    # The `-- vsc-library` pathspec is not cosmetic: a bare `git commit` would sweep in
     # whatever else happened to be staged, and this script must only ever move the pin.
-    git("commit", "-m", "Bump tfm-library pin", "--", SUBMODULE)
+    git("commit", "-m", f"Bump {SUBMODULE} pin", "--", SUBMODULE)
     print(f"\npin recorded: {status()}")
     print("Note the new pin in docs/CHANGELOG.md — a result depends on which literature it")
     print("was checked against.")

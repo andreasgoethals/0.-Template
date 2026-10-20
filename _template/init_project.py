@@ -27,7 +27,7 @@ TEMPLATE_DOC = REPO_ROOT / "docs" / "TEMPLATE.md"
 
 DEFAULT_AUTHOR = "Andreas Goethals"
 DEFAULT_EMAIL = "andreas.goethals@kuleuven.be"
-DEFAULT_LIBRARY_URL = "https://github.com/andreasgoethals/TFM_Library.git"
+DEFAULT_LIBRARY_URL = "https://github.com/andreasgoethals/VSC_Library.git"
 GITHUB_OWNER = "andreasgoethals"
 
 #: File types whose text is substituted. The guard is for the day someone adds an image — a
@@ -39,7 +39,7 @@ TEXT_SUFFIXES = frozenset(
 
 #: Never touched. `_template/` is about to be deleted, and its own documentation quotes
 #: placeholders as examples, which substitution would destroy.
-SKIP_DIRS = frozenset({".git", "_template", "tfm-library", ".venv", "venv", "__pycache__",
+SKIP_DIRS = frozenset({".git", "_template", "tfm-library", "vsc-library", "decision-models-library", ".venv", "venv", "__pycache__",
                        ".pytest_cache", ".ruff_cache", "output", "data"})
 
 #: Upper-case names only, never after a `$`: GitHub Actions expressions look like
@@ -78,25 +78,25 @@ def detected_repo_url() -> str:
 
 
 def submodule_state() -> tuple[str, str]:
-    """(state, advice) for `tfm-library`. Reported, never acted on. Distinguishes the three cases
+    """(state, advice) for `vsc-library`. Reported, never acted on. Distinguishes the three cases
     that look alike from outside and need different fixes."""
     if not (REPO_ROOT / ".git").exists():
         return "unknown", "not a git checkout yet — `git init`, or clone the fork instead"
 
-    gitlink = git("ls-files", "-s", "tfm-library")
+    gitlink = git("ls-files", "-s", "vsc-library")
     if not gitlink.startswith("160000"):
         return (
             "MISSING",
             f"no submodule pin recorded. Add it once:\n"
-            f"       git submodule add {DEFAULT_LIBRARY_URL} tfm-library",
+            f"       git submodule add {DEFAULT_LIBRARY_URL} vsc-library",
         )
-    library = REPO_ROOT / "tfm-library"
+    library = REPO_ROOT / "vsc-library"
     if library.is_dir() and any(library.iterdir()):
         return "populated", "nothing to do"
     return (
         "pinned, empty",
-        "the pin came with the repository; fetch its 749 MB when you want it:\n"
-        "       git submodule update --init",
+        "the pin came with the repository; initialize the shared VSC guidance:\n"
+        "       git submodule update --init -- vsc-library",
     )
 
 
@@ -122,7 +122,6 @@ def derive(project: str, args: argparse.Namespace) -> dict[str, str]:
         "DATE": today.strftime("%d-%m-%Y"),
         "REPO_URL": args.repo_url or detected_repo_url()
                     or f"https://github.com/{GITHUB_OWNER}/{project}",
-        "TFM_LIBRARY_URL": args.library_url,
     }
 
 
@@ -183,10 +182,11 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
      .\\.venv\\Scripts\\Activate.ps1
      pip install -e ".[dev]"
 
-  3. The literature submodule — READ-ONLY in every project
+  3. VSC Library — READ-ONLY in every project
      state: {state} — {advice}
 
-     Copy-Item tfm-library\\PROJECT_SPECIFIC.template.md tfm-library\\PROJECT_SPECIFIC.md
+     Keep project-specific VSC choices in docs/VSC.md.
+     Optional TFM/DM libraries: see docs/TEMPLATE.md.
 
   4. Check it runs.
 
@@ -228,7 +228,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-url", default=None,
                         help="default: this checkout's `origin`, else "
                              f"https://github.com/{GITHUB_OWNER}/<project>")
-    parser.add_argument("--library-url", default=DEFAULT_LIBRARY_URL)
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     args = parser.parse_args(argv)
 

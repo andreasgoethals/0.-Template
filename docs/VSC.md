@@ -1,7 +1,15 @@
 # {{PROJECT_NAME}} on the KU Leuven VSC
 
+Shared infrastructure reference: [VSC Library](../vsc-library/README.md). The parent Git commit pins its revision; inspect it with `git submodule status -- vsc-library`.
+Its [official repository snapshot](<../vsc-library/VSC Repository.txt>),
+[guides](../vsc-library/guides/) and [Slurm templates](<../vsc-library/slurm templates/README.md>)
+are read-only. Keep this project's actual paths, environment, resource choices,
+submission/resume steps and run evidence in this file or the project's own run logs.
+Check [upstream review flags](../vsc-library/UPSTREAM_CHANGES.md) and the
+[live Leuven status](https://status.vscentrum.be/tier2_leuven.html) before applying a changed policy.
+
 How to run this project on the cluster. The authoritative cluster documentation is in the
-`tfm-library/` submodule — read it there and keep this file as *this project's* answer to it, not a
+`vsc-library/` submodule — read it there and keep this file as *this project's* answer to it, not a
 copy. Fill in the `TODO`s the first time you submit.
 
 **Log every run** in the Runs table of [`AGENTS_MEMORY.md`](AGENTS_MEMORY.md): one row with the
@@ -12,15 +20,15 @@ resubmitted months after it already failed.
 
 | Host | Role |
 |---|---|
-| **Genius** | login. SSH lands here — editing, submitting and small tests only, never a run. |
+| **wICE login service** | Shared login nodes — editing, submission and small setup only. |
 | **wICE** | general-purpose compute partitions |
-| **Mindwell** | GPU partitions |
+| **Mindwell** | CPU, GPU, large-memory and interactive compute partitions |
 
 ```bash
 ssh vsc<number>@login.hpc.kuleuven.be
 ```
 
-Compute nodes have **no outbound internet**. Anything that downloads — datasets, weights, a pip
+Do not rely on outbound internet access from compute nodes; stage required assets first. Anything that downloads — datasets, weights, a pip
 package — happens on a login node first. A job that fetches at runtime works locally and hangs
 here.
 
@@ -36,7 +44,7 @@ tiers to the repository root off-cluster, so the same code runs on a laptop unco
 | **personal data** | `$VSC_DATA/{{PROJECT_NAME}}/` | the repository, and the rest of `output/` | 75 GiB |
 | scratch | `$VSC_SCRATCH/` | working scratch only | **purged after 30 days** |
 
-- **Both tiers are backed up.** They differ in size and in convenience: you can browse `$VSC_DATA`
+- **Personal DATA is backed up; confirm the actual group-project storage protection policy.** They differ in size and in convenience: you can browse `$VSC_DATA`
   directly, while anything on project storage has to be pulled down locally first (PowerShell,
   `scp`/`rsync`) before you can look at it. So the big, rarely-read things go to project storage and
   everything you actually want to open stays on `$VSC_DATA`.
@@ -46,9 +54,9 @@ tiers to the repository root off-cluster, so the same code runs on a laptop unco
   Per-step records therefore go to `$VSC_DATA`.
 - Scratch's purge is on **access** time, and `mv` and timestamp-preserving `rsync` do **not** count
   as an access, so freshly staged data can vanish almost immediately. Copy, then
-  `paths.touch_tree()`.
-- Project storage is on **Lustre**: read a checkpoint from it once at job start, never stream from
-  it in a training loop.
+  verify the scratch copy using the current storage guide.
+- Use native **Lustre on wICE** and **GPFS on Mindwell** for intensive I/O; stage between them
+  before compute. P100/V100 nodes cannot access GPFS.
 
 Override the big-file tier without editing code — how the tests exercise it, and how to put data
 on an external drive locally:
@@ -71,9 +79,9 @@ The venv lives on `$VSC_DATA`: it must survive the scratch purge and be backed u
 ## Submitting
 
 ```bash
-sbatch scripts/slurm/job.slurm
-squeue --me
-sacct -j <jobid> --format=JobID,JobName,State,Elapsed,MaxRSS,ExitCode
+sbatch --clusters=wice scripts/slurm/job.slurm
+squeue --clusters=all --me
+sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,MaxRSS,ExitCode
 scancel <jobid>
 ```
 

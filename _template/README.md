@@ -12,7 +12,7 @@ Every rule and every file is explained in [`docs/TEMPLATE.md`](../docs/TEMPLATE.
 
 1. On GitHub, **Use this template** → new repository. Pick the visibility. Clone it.
    (Not a fork: a fork of a public repository can never be made private.)
-2. Fill in the blanks, delete this folder, install, fetch the literature:
+2. Fill in the blanks, delete this folder, install, initialize VSC Library:
 
 ```powershell
 python _template/init_project.py CreditICL --description "One sentence about the project."
@@ -27,7 +27,7 @@ pip install -e ".[dev]"
 ```
 
 ```powershell
-git submodule update --init
+git submodule update --init -- vsc-library
 ```
 
 3. `python -m pytest -q` and `python -m src.utils.run_notebooks` should both pass.
@@ -41,7 +41,7 @@ a wrong partition name fails at submit time, a `TODO` fails at read time.
 ### `init_project.py`
 
 Replaces every `{{PLACEHOLDER}}` with a real value and prints the steps it deliberately does not
-take. It installs nothing, runs no git command, pushes nothing, and does not delete this folder.
+take. It installs nothing, makes no Git changes, pushes nothing, and does not delete this folder.
 `--dry-run` shows the file list first.
 
 | Placeholder | Becomes |
@@ -86,7 +86,9 @@ Work in this order, and stop after step 1 to show me the plan before moving anyt
    (seed its Runs table from whatever cluster runs this project already has).
    Then AGENTS.md at the root, and a CLAUDE.md whose only line is "@AGENTS.md"
    (Claude Code reads CLAUDE.md, every other agent reads AGENTS.md).
-7. tfm-library/ as a submodule if it is not there.
+7. Add vsc-library/ if absent. TFM and DM remain optional: add them only when
+   explicitly requested for this project. Follow docs/TEMPLATE.md for the
+   independent submodule URLs, read-only boundaries and update workflow.
 
 The template is at "C:\Users\U0152019\PhD Documents\Projects\0. Template" — copy
 files from it rather than rewriting them.
