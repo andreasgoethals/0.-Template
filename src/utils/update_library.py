@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--update", action="store_true", help="fetch and move the working tree")
     parser.add_argument("--commit", action="store_true", help="record the new pin (needs --update)")
     parser.add_argument("--library", default="vsc-library",
-                        choices=["vsc-library", "tfm-library", "decision-models-library"])
+                        choices=["vsc-library", "tfm-library", "dm-library"])
     args = parser.parse_args(argv)
     global SUBMODULE
     SUBMODULE = args.library

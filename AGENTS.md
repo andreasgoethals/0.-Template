@@ -18,7 +18,7 @@ first: this is either the un-initialised template or a project where nobody dele
 ## 1. Shared library submodules are read-only
 
 The template includes `vsc-library/`. Projects may independently opt into
-`tfm-library/`, `decision-models-library/`, or additional libraries. See
+`tfm-library/`, `dm-library/`, or additional libraries. See
 [`docs/TEMPLATE.md`](docs/TEMPLATE.md#shared-library-submodules) for registration
 and update commands. Never assume all projects use all libraries.
 

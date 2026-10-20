@@ -41,22 +41,22 @@
   "search.exclude": {
     "tfm-library": true,
     "vsc-library": true,
-    "decision-models-library": true,
+    "dm-library": true,
     "output": true,
     "data": true,
     ".venv": true
   },
-  "python.analysis.exclude": ["tfm-library", "vsc-library", "decision-models-library", "output", "data"],
+  "python.analysis.exclude": ["tfm-library", "vsc-library", "dm-library", "output", "data"],
 
   // Editor protection supports the read-only contract; it is not a filesystem permission.
   "files.readonlyInclude": {
     "tfm-library/**": true,
     "vsc-library/**": true,
-    "decision-models-library/**": true
+    "dm-library/**": true
   },
   "files.readonlyExclude": {
     "tfm-library/PROJECT_SPECIFIC.md": true,
-    "decision-models-library/PROJECT_SPECIFIC.md": true
+    "dm-library/PROJECT_SPECIFIC.md": true
   },
 
   "files.eol": "\n",

@@ -372,7 +372,7 @@ Libraries are independent repositories. Add only those the project needs:
 |---|---|---|
 | VSC infrastructure | [VSC Library](https://github.com/andreasgoethals/VSC_Library) | `vsc-library` |
 | Tabular foundation models (optional) | [TFM Library](https://github.com/andreasgoethals/TFM_Library) | `tfm-library` |
-| Decision models (optional) | [DM Library](https://github.com/andreasgoethals/DM_Library) | `decision-models-library` |
+| Decision models (optional) | [DM Library](https://github.com/andreasgoethals/DM_Library) | `dm-library` |
 
 For a project without VSC Library, this is the complete registration example:
 

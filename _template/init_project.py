@@ -43,7 +43,7 @@ TEXT_SUFFIXES = frozenset(
 
 #: Never touched. `_template/` is about to be deleted, and its own documentation quotes
 #: placeholders as examples, which substitution would destroy.
-SKIP_DIRS = frozenset({".git", "_template", "tfm-library", "vsc-library", "decision-models-library", ".venv", "venv", "__pycache__",
+SKIP_DIRS = frozenset({".git", "_template", "tfm-library", "vsc-library", "dm-library", ".venv", "venv", "__pycache__",
                        ".pytest_cache", ".ruff_cache", "output", "data"})
 
 #: Upper-case names only, never after a `$`: GitHub Actions expressions look like

@@ -233,7 +233,7 @@ def notebooks_dir() -> Path:
 
 def library_dir(name: str = "vsc-library") -> Path:
     """The read-only literature submodule. READ from it; never write inside it."""
-    if name not in {"vsc-library", "tfm-library", "decision-models-library"}:
+    if name not in {"vsc-library", "tfm-library", "dm-library"}:
         raise ValueError(f"Unknown library mountpoint: {name}")
     return REPO_ROOT / name
 

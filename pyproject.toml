@@ -55,14 +55,14 @@ Repository = "{{REPO_URL}}"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
-exclude = ["tfm-library*", "vsc-library*", "decision-models-library*", "notebooks*", "data*", "output*", "checkpoints*", "docs*"]
+exclude = ["tfm-library*", "vsc-library*", "dm-library*", "notebooks*", "data*", "output*", "checkpoints*", "docs*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 extend-exclude = [
     # Read-only submodule. Never lint, never format, never touch.
-    "tfm-library", "vsc-library", "decision-models-library",
+    "tfm-library", "vsc-library", "dm-library",
     # Generated output and notebook JSON are not source.
     "output",
     "notebooks",
@@ -84,7 +84,7 @@ addopts = "-ra --strict-markers"
 # WHY: without this, pytest walks library submodules and tries to collect the upstream
 # code snapshots as tests. It finds "test" in filenames there and fails on imports
 # of packages this project does not have.
-norecursedirs = ["tfm-library", "vsc-library", "decision-models-library", "output", "data", ".venv", "venv", "notebooks"]
+norecursedirs = ["tfm-library", "vsc-library", "dm-library", "output", "data", ".venv", "venv", "notebooks"]
 markers = [
     "slow: takes more than a few seconds",
     "gpu: requires CUDA; tests must explicitly check availability or be deselected",
