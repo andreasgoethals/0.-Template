@@ -90,7 +90,7 @@ Work in this order, and stop after step 1 to show me the plan before moving anyt
 6. docs/: .md only, CAPITALS, plus CHANGELOG.md, VSC.md, and AGENTS_MEMORY.md
    (seed its Runs table from whatever cluster runs this project already has).
    Then AGENTS.md at the root, and a CLAUDE.md whose only line is "@AGENTS.md"
-   (Claude Code reads CLAUDE.md, every other agent reads AGENTS.md).
+   (Claude Code imports it; configure other tools to read AGENTS.md as needed).
 7. Add vsc-library/ if absent. TFM and DM remain optional: add them only when
    explicitly requested for this project. Follow docs/TEMPLATE.md for the
    independent submodule URLs, read-only boundaries and update workflow.
@@ -114,5 +114,5 @@ name, so `pip install -e .` fails here. Tests still run — `tests/conftest.py` 
 it still works.
 
 **Keep it project-agnostic.** No dataset, model, experiment or result anywhere. Several files under
-`src/` ship deliberately empty; fill one in only when the behaviour is genuinely identical in every
-project.
+`src/` ship deliberately empty; fill them only with broadly useful defaults that projects
+can adapt.

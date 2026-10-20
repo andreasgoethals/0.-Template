@@ -27,6 +27,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from src.utils.atomic import write_text
 from src.utils.paths import figures_dir
 
 #: Vector already, but heatmaps and scatter clouds inside a PDF rasterise, so it still needs a
@@ -128,9 +129,7 @@ class FigureSaver:
         )
         # Rewritten after every figure, so a notebook that dies halfway still has a manifest
         # describing the figures it did produce.
-        manifest_path(self.notebook).write_text(
-            json.dumps(self.entries, indent=2), encoding="utf-8"
-        )
+        write_text(manifest_path(self.notebook), json.dumps(self.entries, indent=2))
         return path
 
     def summary(self) -> str:

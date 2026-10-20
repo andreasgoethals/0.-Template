@@ -26,7 +26,8 @@ This licence covers only this project's own code and documentation.
 
 Third-party material keeps its own licence and is not relicensed here:
 
-  * `tfm-library/` — a git submodule. Its documents and the upstream code
+  * Shared library submodules (`vsc-library/` and any optional libraries).
+    Their documents and upstream code
     snapshots inside it are governed by that repository's licence and by the
     licences of the works it collects.
   * `data/` — every dataset keeps the terms it was distributed under. Several

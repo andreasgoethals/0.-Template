@@ -1,4 +1,4 @@
-# Came with the template, and worth keeping: `src/utils/paths.py` is identical in every project,
+# Tests for the template's default resolver; adapt them if the project changes storage policy.
 # and every other module trusts it. The interesting cases only happen on the cluster, so they are
 # forced with environment variables rather than left untested until a job hits them.
 """`src/utils/paths.py` — the resolver. Tested because every other module trusts it.
@@ -10,6 +10,8 @@ environment variables rather than left untested until a job hits them.
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 
 from src.utils import paths
 
@@ -64,6 +66,26 @@ def test_staging_override_works_off_cluster(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv(paths.STAGING_ENV_VARS[0], str(tmp_path / "external"))
     assert paths.on_vsc() is False
     assert paths.checkpoints_dir().is_relative_to(tmp_path / "external")
+
+
+def test_cluster_allocation_must_be_configured(monkeypatch, tmp_path):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path))
+    for name in paths.STAGING_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(ValueError, match="allocated"):
+        paths.staging_root()
+
+
+def test_relative_override_uses_repo_not_cwd(monkeypatch, tmp_path):
+    monkeypatch.setenv(paths.STAGING_ENV_VARS[0], "storage")
+    monkeypatch.chdir(tmp_path)
+    assert paths.staging_root() == paths.REPO_ROOT / "storage"
+
+
+@pytest.mark.parametrize("name", ["../escape", "nested/name", r"nested\name"])
+def test_figure_folder_cannot_escape(name):
+    with pytest.raises(ValueError):
+        paths.figures_dir(name)
 
 
 def test_figures_dir_is_per_notebook() -> None:

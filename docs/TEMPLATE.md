@@ -25,7 +25,7 @@ project-specific belongs in `README.md` or another `docs/` file, not here.
 │   ├── AGENTS_MEMORY.md     the runs done, and the dead ends
 │   └── VSC.md               how THIS project runs on the VSC cluster
 ├── notebooks/               thin: all logic imported from src/
-├── output/                  EVERYTHING the code generates
+├── output/                  generated reports, logs and results
 │   ├── All_Results.md       every notebook's printed summary
 │   ├── figures/
 │   │   ├── CAPTIONS.md      one shared captions file
@@ -39,6 +39,7 @@ project-specific belongs in `README.md` or another `docs/` file, not here.
 │   ├── data/loaders.py      loading and preprocessing
 │   ├── utils/
 │   │   ├── paths.py         every path in the project
+│   │   ├── atomic.py        replace complete text reports and metadata
 │   │   ├── clean_run.py     wipe the previous run
 │   │   ├── run_notebooks.py run every notebook, rebuild both summaries
 │   │   ├── update_library.py
@@ -51,6 +52,7 @@ project-specific belongs in `README.md` or another `docs/` file, not here.
 ├── tests/
 ├── vsc-library/             submodule: HPC/VSC guides and templates. READ-ONLY.
 ├── .vscode/settings.json
+├── .github/dependabot.yml   proposes VSC submodule pin updates
 ├── .gitattributes  .gitignore  .gitmodules
 ├── AGENTS.md                the rules for every agent
 ├── CLAUDE.md                one line: `@AGENTS.md`
@@ -117,12 +119,11 @@ records **experience**, and it has two halves:
   cost more than a couple of minutes, including what you eventually fixed: the fix is one changelog
   line, the dead end was the hour.
 
-Newest first, `DD-MM-YYYY`, and **short** — one line per run, four per dead end. An agent reads it
+Newest first, `DD-MM-YYYY`, and **as short as possible without losing useful evidence**. An agent reads it
 *before* starting and never deletes an entry: a run you would otherwise repeat and a dead end you
 already paid for are both evidence.
 
-The run table starts empty. Template-maintenance notes may already be present;
-record the new project's own runs and dead ends as work begins.
+The run table starts empty. Record the new project's runs and dead ends as work begins.
 
 ### `VSC.md`
 
@@ -134,7 +135,7 @@ Built from the VSC documentation in `vsc-library/`, but written about this proje
 
 | tier | path | holds |
 |---|---|---|
-| **project storage** | `/lustre1/project/stg_00211/<Project>/` | big files: datasets, checkpoints, caches, **`output/results/`** |
+| **project storage** | `<configured staging root>/<Project>/` | big files: datasets, checkpoints, caches, **`output/results/`** |
 | **personal data** | `$VSC_DATA/<Project>/` | the repository, and the rest of `output/` |
 
 **Personal DATA is backed up; verify the allocation-specific project-storage protection policy.** They differ in size and in convenience: `$VSC_DATA` is only 75 GiB but you
@@ -142,6 +143,11 @@ can browse it directly, while project storage is large but has to be pulled down
 (PowerShell, `scp`/`rsync`) before you can look at anything in it. So the big, rarely-read things
 go to project storage and everything you actually want to open stays on `$VSC_DATA`. Project
 storage also has a **low inode budget** — few big files, not thousands of small ones.
+
+Set `<PROJECT_UPPER>_STAGING_ROOT` (or `VSC_STAGING_ROOT`) to the allocated storage
+directory; the resolver appends the project name. On VSC, missing configuration raises an
+error rather than guessing an allocation. Locally, unset roots use the repository;
+relative overrides are resolved against its root.
 
 `$VSC_SCRATCH` is purged after 30 days **without access**, and `mv` and timestamp-preserving
 `rsync` do not count as an access. Do not rely on outbound internet from compute nodes;
@@ -174,10 +180,11 @@ Thin. A notebook presents a finished computation; it does not perform one.
 
 ## `output/`
 
-**Everything the code generates goes under `output/`**, locally and on the cluster. Not beside a
+**Reports, logs and results go under `output/`**, locally and on the cluster. Not beside a
 notebook, not into `src/`, not into a new top-level folder. One root means "what did this run
 produce?" and "what can I delete?" each have one answer — and it is what makes
-`src/utils/clean_run.py` possible at all.
+`src/utils/clean_run.py` possible at all. Rebuildable caches belong in `data/processed/`;
+weights and costly resumable state belong in `checkpoints/`, outside routine cleanup.
 
 ### `logs/`
 
@@ -206,8 +213,8 @@ reach gigabytes and `$VSC_DATA` is 75 GiB. Locally it is a plain subdirectory.
 
 ### `figures/<notebook>/`
 
-**One PDF per figure**, plus the runner's `_figures.json` caption metadata and temporary
-`_stdout.txt` capture. Vector, with text embedded as TrueType so journal systems
+**One PDF per figure**, plus `FigureSaver`'s `_figures.json` caption metadata and retained
+`_stdout.txt` summary. A `_failure.txt` marks an incomplete runner execution. Vector, with text embedded as TrueType so journal systems
 accept it. No PNG on disk: the notebook displays its figures inline, so there is no second raster
 copy to go stale. Sized for A4 — see `src/visualize/`.
 
@@ -258,9 +265,8 @@ normal POSIX syntax — unlike everything you type locally.
 
 All importable logic. Always has `data/`, `utils/`, `visualize/`; add more as the project needs.
 
-**Most of these files ship empty**, as markers for something every project has but no two projects
-implement the same way. A file is filled in only when the behaviour is genuinely identical
-everywhere — and then it is identical, so do not rewrite it.
+`config.py` and `data/loaders.py` are placeholders. The other modules provide reusable defaults;
+adapt them when the project's needs differ. `__init__.py` files mark Python packages.
 
 ### `src/utils/`
 
@@ -273,11 +279,21 @@ everywhere — and then it is identical, so do not rewrite it.
   invocation, locally or on the cluster, and leaves the tracked `.gitkeep` markers so the next run
   has somewhere to write. `--processed` additionally clears `data/processed/`; that is opt-in
   because rebuilding the cache can cost far more than re-running the notebooks. `data/raw/`,
-  weights and library submodules are never touched.
+  weights and library submodules are never touched. Preview lists individual files and validates
+  all targets before deletion; links and Windows junctions are refused. Stop writers before
+  cleaning. Keep paid responses and costly/resumable artifacts outside disposable targets.
+- **`atomic.py`** — writes UTF-8 text to a sibling temporary file, then replaces the destination.
+  Reports and figure metadata use it so interrupted writes do not expose truncated files.
+  It provides neither locking nor a multi-file transaction.
 - **`run_notebooks.py`** — *filled in.* `python -m src.utils.run_notebooks` runs every notebook in
   parallel, in separate processes (matplotlib's figure registry is global), then rebuilds
   `CAPTIONS.md` and `All_Results.md`. Notebooks are **discovered**, alphabetically — a hard-coded
   list silently stops covering a notebook someone added.
+  The lightweight runner supports top-level Python notebooks, not Jupyter magics or shell
+  commands (except `%matplotlib inline`, ignored headlessly). It captures the final nonempty
+  code cell's stdout, keeps it for rebuilding, and marks failed/incomplete runs in both reports.
+  Partial reruns preserve other discovered notebooks' last reports. Use a project-specific
+  Jupyter runner if kernel features or nested notebooks are needed.
 - **`update_library.py`** — *filled in.* Bumps this project's submodule pin; see below.
 - **`logging_setup.py`** — *filled in, minimal.* One logger, writing to the console **and** to
   `output/logs/`. Scheduler stdout follows the submission settings; a log the code
@@ -325,9 +341,9 @@ skip what is obvious. Tests never write outside `tmp_path` or `output/`.
 install), forces matplotlib's `Agg` backend, and provides `isolated_output`, which redirects both
 cluster tiers into `tmp_path` — exercising the branch that otherwise only runs in production.
 
-The template ships tests for the files it ships filled in — `paths.py`, `clean_run.py`,
-`run_notebooks.py`, `figures.py`, `style.py`. Those modules are identical in every project, so the
-tests are too. Each says so in a comment at the top. Keep them; add your own beside them.
+The supplied tests cover path resolution, cleanup boundaries, atomic replacement, notebook
+reports, PDF figures, A4 sizing, library updates and initialization. Their header comments
+explain the intent. Keep relevant tests and adapt them alongside project changes.
 
 **Nothing runs them automatically.** There is no CI and no pre-commit hook in the template, so an
 agent has to be told:
@@ -416,7 +432,7 @@ change a consumer's committed pin; run propagation or merge an update proposal.
 - **`README.md`** — the project's own front page. It **ends** with the short "Based on the
   repository template" chapter and nothing after it; everything above is the project's.
 - **`CLAUDE.md`** — one line, `@AGENTS.md`. Claude Code reads `CLAUDE.md` and not `AGENTS.md`,
-  while every other agent (Codex, Cursor, Copilot, Windsurf) reads `AGENTS.md`. So `AGENTS.md` is
+  while Codex reads `AGENTS.md` directly. Other tools may need explicit configuration. `AGENTS.md` is
   the single source of truth and this file imports it — nothing duplicated, nothing to keep in sync.
   A symlink also works, but not on Windows without Administrator rights, so the import is the
   portable form. Claude-specific instructions, if ever needed, go below the import.
@@ -448,3 +464,14 @@ change a consumer's committed pin; run propagation or merge an update proposal.
 Every non-obvious decision carries a short comment saying **why**, not what: a pin, a fallback, an
 exclusion, a magic number, an ordering that matters. Say what breaks if it changes. Comments that
 restate the code are noise.
+
+## `_template/`
+
+Template-only setup, removed after initialization: `README.md` explains creating or adopting
+a project; `init_project.py` substitutes names and metadata after validating all replacements.
+It skips submodules, linked directories and generated files and performs no installs or Git writes.
+
+## `.github/`
+
+`dependabot.yml` proposes daily updates to the registered VSC Library pin. It does not
+run tests or merge updates; review proposals before accepting them.

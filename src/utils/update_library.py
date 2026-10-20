@@ -64,8 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{SUBMODULE} is not registered. See docs/TEMPLATE.md.")
         return 1
     if not (REPO_ROOT / SUBMODULE).exists():
-        print(f"{SUBMODULE}/ is missing. Add it with:")
-        print(f"  git submodule add <library repo url> {SUBMODULE}")
+        print(f"{SUBMODULE}/ is registered but missing. Initialize it with:")
+        print(f"  git submodule update --init -- {SUBMODULE}")
         return 1
 
     line = status()

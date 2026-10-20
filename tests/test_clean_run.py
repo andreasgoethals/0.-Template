@@ -1,9 +1,14 @@
-# Came with the template, and worth keeping: `src/utils/clean_run.py` is identical in every
-# project, and it deletes things. The one behaviour worth pinning is that a wipe leaves the tracked
+# Cleanup regression tests protect deletion boundaries and preview behavior.
+# A wipe leaves the tracked
 # `.gitkeep` markers and their directories behind — without them a fresh clone has nowhere to write.
 """`src/utils/clean_run.py` — the wipe."""
 
 from __future__ import annotations
+
+import subprocess
+import sys
+
+import pytest
 
 from src.utils import clean_run
 
@@ -68,3 +73,42 @@ def test_processed_is_opt_in(isolated_output) -> None:
 
     assert processed_dir() not in clean_run.roots()
     assert processed_dir() in clean_run.roots(processed=True)
+
+
+def test_project_storage_output_beyond_results_is_cleared(isolated_output):
+    root = clean_run.roots()[1]
+    (root / "logs").mkdir(parents=True)
+    (root / "logs" / "old.log").write_text("old")
+    assert clean_run.wipe(root) == 1
+
+
+def test_unregistered_root_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="Not a cleanup target"):
+        clean_run.wipe(tmp_path)
+
+
+def test_linked_directory_is_refused_before_any_deletion(isolated_output):
+    root = clean_run.roots()[0]
+    root.mkdir(parents=True)
+    victim = root / "ordinary.txt"
+    victim.write_text("keep until preflight completes")
+    outside = isolated_output / "outside"
+    outside.mkdir()
+    (outside / "precious.txt").write_text("preserve")
+    link = root / "linked"
+    if sys.platform == "win32":
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(outside)],
+                       check=True, capture_output=True)
+    else:
+        link.symlink_to(outside, target_is_directory=True)
+    try:
+        with pytest.raises(ValueError, match="linked path"):
+            clean_run.wipe(root)
+        assert victim.exists()
+        assert (outside / "precious.txt").exists()
+    finally:
+        # Remove only the junction/link itself, never recurse through it.
+        if sys.platform == "win32":
+            link.rmdir()
+        else:
+            link.unlink()

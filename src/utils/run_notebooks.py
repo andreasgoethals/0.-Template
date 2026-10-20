@@ -13,8 +13,8 @@ one interpreter would capture each other's figures — silently, giving plausibl
 attributed to the wrong notebook.
 
 A FLATTENED SCRIPT, NOT A JUPYTER KERNEL: nothing extra to install, identical on the cluster,
-and a traceback points at a line number instead of a cell index. This lightweight runner strips
-magics; notebooks that depend on them need a real Jupyter kernel runner.
+and a traceback points at a line number instead of a cell index. This lightweight runner rejects
+magics except `%matplotlib inline`; notebooks needing them require a Jupyter kernel runner.
 
 THE RUNNER DOES NOT SAVE FIGURES; each notebook does, through `FigureSaver`, so an interactive
 *Run All* produces exactly the same PDFs. The runner adds parallelism and the two documents.
@@ -35,6 +35,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.utils.atomic import write_text
 from src.utils.paths import (
     REPO_ROOT,
     all_results_path,
@@ -47,9 +48,9 @@ from src.utils.paths import (
 #: longer is doing work that belongs in a script.
 DEFAULT_TIMEOUT = 1800
 
-#: Captured stdout, parked between execution and assembly, then removed. `_figures.json` is
-#: KEPT: CAPTIONS.md must be rebuildable from disk without re-executing anything.
+#: Retained to rebuild reports and preserve unaffected notebooks during partial reruns.
 STDOUT_FILE = "_stdout.txt"
+FAILURE_FILE = "_failure.txt"
 
 
 @dataclass
@@ -64,6 +65,8 @@ class NotebookResult:
 def discover(names: tuple[str, ...] | None = None) -> tuple[str, ...]:
     """Notebook stems, alphabetical. `names` overrides discovery for a partial rerun."""
     if names:
+        for name in names:
+            figures_dir(name)  # Validate before constructing input or output paths.
         return tuple(names)
     return tuple(sorted(p.stem for p in notebooks_dir().glob("*.ipynb")))
 
@@ -89,57 +92,67 @@ def _build_script(nb_path: Path, text_path: Path) -> str:
     """Flatten a notebook's code cells into one script under the capture prelude."""
     nb = json.loads(nb_path.read_text(encoding="utf-8"))
     parts = [_prelude(), "\nwith _redirect(_TEXT):\n"]
-    for i, cell in enumerate(nb.get("cells", []), start=1):
+    code_cells = [c for c in nb.get("cells", []) if c.get("cell_type") == "code"
+                  and "".join(c.get("source", [])).strip()]
+    if not code_cells:
+        raise ValueError("Notebook has no code cells; there is no summary to capture.")
+    for i, cell in enumerate(code_cells, start=1):
         if cell.get("cell_type") != "code":
             continue
         source = "".join(cell.get("source", []))
-        # Strip IPython magics and shell escapes: they are syntax errors in a plain
-        # interpreter. Notebooks must not depend on these under this runner.
-        source = re.sub(r"^\s*[%!].*$", "", source, flags=re.M)
+        # Inline display is harmless headlessly; other magics may change the computation.
+        source = re.sub(r"^\s*%matplotlib inline\s*$", "", source, flags=re.M)
+        if re.search(r"^\s*[%!]", source, flags=re.M):
+            raise ValueError("IPython magics/shell commands require a Jupyter runner.")
+        if i == len(code_cells):
+            parts.append("    _TEXT.seek(0)\n    _TEXT.truncate(0)\n")
         body = "\n".join(f"    {line}" for line in source.split("\n"))
         parts.append(f"\n    # ---- cell {i} ----\n{body}\n")
     parts.append(
-        "\nimport pathlib as _pl\n"
-        f"_pl.Path(r{str(text_path)!r}).write_text(_TEXT.getvalue(), encoding='utf-8')\n"
+        "\nfrom pathlib import Path as _Path\n"
+        "from src.utils.atomic import write_text as _write\n"
+        f"_write(_Path({str(text_path)!r}), _TEXT.getvalue())\n"
     )
     return "".join(parts)
 
 
 def run_one(name: str, timeout: int = DEFAULT_TIMEOUT) -> NotebookResult:
-    """Execute one notebook in a fresh process. Never raises — it reports."""
+    """Execute one notebook in a fresh process; report execution failures."""
     started = time.time()
     nb_path = notebooks_dir() / f"{name}.ipynb"
-    if not nb_path.is_file():
-        return NotebookResult(name, False, 0.0, 0, f"{nb_path} not found")
-
     out_dir = figures_dir(name)
     out_dir.mkdir(parents=True, exist_ok=True)
     text_path = out_dir / STDOUT_FILE
+    failure_path = out_dir / FAILURE_FILE
+    text_path.unlink(missing_ok=True)
+    write_text(failure_path, "Run incomplete; no current successful summary.")
+    if not nb_path.is_file():
+        write_text(failure_path, f"{nb_path} not found")
+        return NotebookResult(name, False, 0.0, 0, f"{nb_path} not found")
 
     # The generated script goes to the system temp dir, NOT into the figure folder: the
     # notebook clears that folder as its first act, and on Windows a directory cannot be
     # modified while it holds the script currently being executed from it.
-    tmp = Path(tempfile.gettempdir()) / f"nbrun_{name}.py"
-    tmp.write_text(_build_script(nb_path, text_path), encoding="utf-8")
     try:
-        proc = subprocess.run(
-            [sys.executable, str(tmp)],
-            cwd=str(REPO_ROOT),   # so `from src...` resolves without an install
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        return NotebookResult(name, False, time.time() - started, 0, f"timed out after {timeout}s")
-    finally:
-        tmp.unlink(missing_ok=True)
+        with tempfile.TemporaryDirectory(prefix="notebook_") as directory:
+            tmp = Path(directory) / "run.py"
+            script = f"import sys\nsys.path.insert(0, {str(REPO_ROOT)!r})\n"
+            tmp.write_text(script + _build_script(nb_path, text_path), encoding="utf-8")
+            proc = subprocess.run(
+                [sys.executable, str(tmp)], cwd=str(REPO_ROOT),
+                capture_output=True, text=True, timeout=timeout, check=False,
+            )
+    except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        write_text(failure_path, str(exc))
+        return NotebookResult(name, False, time.time() - started, 0, str(exc))
 
     n_figs = len(list(out_dir.glob("*.pdf")))
     if proc.returncode != 0:
         # Only the tail: a full traceback from twelve notebooks buries the one that matters.
         tail = "\n".join((proc.stderr or "").strip().splitlines()[-12:])
+        write_text(failure_path, tail)
         return NotebookResult(name, False, time.time() - started, n_figs, tail)
+    failure_path.unlink(missing_ok=True)
     return NotebookResult(name, True, time.time() - started, n_figs)
 
 
@@ -149,6 +162,9 @@ def run_one(name: str, timeout: int = DEFAULT_TIMEOUT) -> NotebookResult:
 
 
 def _captured_text(name: str) -> str:
+    failure = figures_dir(name) / FAILURE_FILE
+    if failure.exists():
+        return "FAILED / INCOMPLETE\n" + failure.read_text(encoding="utf-8")
     path = figures_dir(name) / STDOUT_FILE
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
@@ -176,7 +192,10 @@ def write_captions(notebooks: tuple[str, ...]) -> Path:
         "in the document, because that rescales its text with it.",
         "",
     ]
-    for name in notebooks:
+    for name in sorted(notebooks):
+        if (figures_dir(name) / FAILURE_FILE).exists():
+            lines += [f"## {name}", "", "_FAILED / INCOMPLETE: figures are not current._", ""]
+            continue
         entries = read_manifest(name)
         lines += [f"## {name}", ""]
         if not entries:
@@ -189,7 +208,7 @@ def write_captions(notebooks: tuple[str, ...]) -> Path:
             lines.append("")
     path = captions_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text(path, "\n".join(lines))
     return path
 
 
@@ -217,14 +236,8 @@ def write_all_results(notebooks: tuple[str, ...]) -> Path:
         lines += ["---", "", f"## {name}", "", "```", text or "(no output captured)", "```", ""]
     path = all_results_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text(path, "\n".join(lines))
     return path
-
-
-def _cleanup(notebooks: tuple[str, ...]) -> None:
-    """Drop the captured-stdout scratch files once folded into `All_Results.md`."""
-    for name in notebooks:
-        (figures_dir(name) / STDOUT_FILE).unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
@@ -255,9 +268,9 @@ def run_all(
         for fut in as_completed(futures):
             results.append(fut.result())
 
-    write_captions(names)
-    write_all_results(names)
-    _cleanup(names)
+    report_names = tuple(sorted(set(discover()) | set(names)))
+    write_captions(report_names)
+    write_all_results(report_names)
     return sorted(results, key=lambda r: names.index(r.name))
 
 
@@ -285,8 +298,8 @@ def summarise(results: list[NotebookResult]) -> str:
 
 # ---------------------------------------------------------------------------
 # Entry point. `--summaries-only` exists because both documents are built from what the notebooks
-# left on disk (`_figures.json`), so after an interactive Jupyter session they can be regenerated
-# without executing anything.
+# left on disk (`_figures.json` and retained final-cell stdout). Interactive saves refresh captions;
+# text summaries need a runner execution. No code runs with --summaries-only.
 # ---------------------------------------------------------------------------
 
 

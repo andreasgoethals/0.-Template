@@ -85,7 +85,7 @@ def submodule_state() -> tuple[str, str]:
     """(state, advice) for `vsc-library`. Reported, never acted on. Distinguishes the three cases
     that look alike from outside and need different fixes."""
     if not (REPO_ROOT / ".git").exists():
-        return "unknown", "not a git checkout yet — `git init`, or clone the fork instead"
+        return "unknown", "not a git checkout yet — `git init`, or clone the new repository"
 
     gitlink = git("ls-files", "-s", "vsc-library")
     if not gitlink.startswith("160000"):
@@ -233,7 +233,7 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
      docs/VSC.md        fill in the TODOs: partition, walltime, credit account.
      scripts/slurm/job.slurm    the same TODOs.
      config/                    real configs; delete example.yaml.
-     src/visualize/style.py     register this project's series names, once.
+     src/visualize/style.py     define this project's shared plotting style.
      notebooks/example_analysis.ipynb   the pattern to copy, then delete.
      docs/CHANGELOG.md          add the first project entry dated {values["DATE"]}.
 

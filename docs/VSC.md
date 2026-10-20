@@ -40,7 +40,7 @@ tiers to the repository root off-cluster, so the same code runs on a laptop unco
 
 | tier | path | holds | quota |
 |---|---|---|---|
-| **project storage** | `/lustre1/project/stg_00211/{{PROJECT_NAME}}/` | datasets, checkpoints, caches, **`output/results/`** | large, **low inodes** |
+| **project storage** | `<configured staging root>/{{PROJECT_NAME}}/` | datasets, checkpoints, caches, **`output/results/`** | allocation-specific |
 | **personal data** | `$VSC_DATA/{{PROJECT_NAME}}/` | the repository, and the rest of `output/` | 75 GiB |
 | scratch | `$VSC_SCRATCH/` | working scratch only | **purged after 30 days** |
 
@@ -58,8 +58,9 @@ tiers to the repository root off-cluster, so the same code runs on a laptop unco
 - Use native **Lustre on wICE** and **GPFS on Mindwell** for intensive I/O; stage between them
   before compute. P100/V100 nodes cannot access GPFS.
 
-Override the big-file tier without editing code — how the tests exercise it, and how to put data
-on an external drive locally:
+Configure the allocated big-file tier before cluster use. No allocation is guessed.
+The project name is appended; supply the shared root, not the project directory.
+The same override supports an external drive locally:
 
 ```bash
 export {{PROJECT_UPPER}}_STAGING_ROOT=/some/other/place
@@ -127,7 +128,7 @@ rsync -av vsc<number>@login.hpc.kuleuven.be:$VSC_DATA/{{PROJECT_NAME}}/output/ .
 ```
 
 `output/results/` is on project storage, so it is a second copy from
-`/lustre1/project/stg_00211/{{PROJECT_NAME}}/output/results/`.
+`<configured staging root>/{{PROJECT_NAME}}/output/results/`.
 
 ```bash
 python -m src.utils.clean_run                       # list what the previous run left

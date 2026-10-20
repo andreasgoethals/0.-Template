@@ -1,5 +1,4 @@
-# Came with the template, and worth keeping: `src/visualize/figures.py` is identical in every
-# project. These pin the behaviour the layout depends on — PDF only, the folder cleared before
+# Tests for reusable figure-saving behavior — PDF only, the folder cleared before
 # drawing, and only ever this notebook's own folder.
 """`src/visualize/figures.py` — the saver.
 

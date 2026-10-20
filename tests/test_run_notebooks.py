@@ -1,5 +1,4 @@
-# Came with the template, and worth keeping: `src/utils/run_notebooks.py` is identical in every
-# project, and these pin the two documented contracts — notebooks discovered alphabetically, and
+# Tests for report behavior — notebooks discovered alphabetically, and
 # `All_Results.md` sorted alphabetically with each block verbatim.
 """`src/utils/run_notebooks.py` — the runner and the two summary documents.
 
@@ -52,14 +51,15 @@ def test_discovery_can_be_overridden_for_a_partial_rerun(tmp_path, monkeypatch) 
     assert rn.discover(("only_this",)) == ("only_this",)
 
 
-def test_magics_are_stripped_from_the_flattened_script(tmp_path) -> None:
-    """`%matplotlib inline` is a syntax error in a plain interpreter, and a notebook that
-    needs a magic to run cannot be executed non-interactively at all."""
+def test_only_inline_magic_is_ignored(tmp_path) -> None:
+    """Never silently skip a command that could affect the result."""
     nb = tmp_path / "nb.ipynb"
-    make_notebook(nb, ["%matplotlib inline\nprint('hello')", "!ls\nprint('two')"])
+    make_notebook(nb, ["%matplotlib inline\nprint('hello')"])
     script = rn._build_script(nb, tmp_path / "out.txt")
-    assert "%matplotlib" not in script and "!ls" not in script
-    assert "print('hello')" in script and "print('two')" in script
+    assert "%matplotlib" not in script and "print('hello')" in script
+    make_notebook(nb, ["!ls\nprint('two')"])
+    with pytest.raises(ValueError, match="Jupyter"):
+        rn._build_script(nb, tmp_path / "out.txt")
 
 
 def test_markdown_cells_are_skipped(tmp_path) -> None:
@@ -148,6 +148,51 @@ def test_summarise_says_where_everything_went() -> None:
     assert "OK" in text and "FAILED" in text and "ValueError: nope" in text
     assert "1/2 notebooks OK" in text
     assert rn.summarise([]) == "No notebooks found in notebooks/."
+
+
+def test_final_cell_only_and_failed_rerun_replaces_old_summary(isolated_output, monkeypatch):
+    from src.utils.paths import figures_dir
+
+    nb_dir = isolated_output / "notebooks"
+    monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
+    nb = nb_dir / "report.ipynb"
+    make_notebook(nb, ["print('setup noise')", "print('FINAL RESULTS')"])
+    assert rn.run_one("report").ok
+    assert rn._captured_text("report") == "FINAL RESULTS\n"
+    rn.write_all_results(("report",))
+    # Rebuilding must not erase stdout from the prior execution.
+    assert "FINAL RESULTS" in rn.write_all_results(("report",)).read_text()
+    make_notebook(nb, ["raise RuntimeError('failed rerun')"])
+    assert not rn.run_one("report").ok
+    assert "FAILED" in rn._captured_text("report")
+    assert "FINAL RESULTS" not in rn._captured_text("report")
+    assert not (figures_dir("report") / rn.STDOUT_FILE).exists()
+    assert "FAILED" in rn.write_captions(("report",)).read_text()
+
+
+def test_empty_notebook_reports_clear_failure(isolated_output, monkeypatch):
+    nb_dir = isolated_output / "notebooks"
+    monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
+    make_notebook(nb_dir / "empty.ipynb", [])
+    result = rn.run_one("empty")
+    assert not result.ok
+    assert "no code cells" in result.error
+
+
+def test_partial_rerun_keeps_other_notebooks_reports(isolated_output, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    nb_dir = isolated_output / "notebooks"
+    monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
+    # run_one still executes subprocesses; threads here let the discovery patch be shared.
+    monkeypatch.setattr(rn, "ProcessPoolExecutor", ThreadPoolExecutor)
+    for name in ("a", "b"):
+        make_notebook(nb_dir / f"{name}.ipynb", [f"print('summary {name}')"])
+    assert all(r.ok for r in rn.run_all())
+    make_notebook(nb_dir / "a.ipynb", ["print('updated a')"])
+    assert all(r.ok for r in rn.run_all(("a",)))
+    text = rn.all_results_path().read_text()
+    assert "updated a" in text and "summary b" in text
 
 
 @pytest.mark.slow

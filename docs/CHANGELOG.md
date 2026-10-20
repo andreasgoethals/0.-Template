@@ -2,6 +2,8 @@
 
 ## 20-10-2026
 
+- Hardened cleanup against linked paths, added atomic report writes and explicit cluster allocation configuration, and fixed retained notebook summaries and failed-rerun reporting.
+- Removed stale setup/configuration claims and README duplication; kept configuration, provenance schemas and verification commands project-defined.
 - Fixed initializer escaping and preflight checks; aligned editor protection, library commands and Slurm guidance with the independent-library layout.
 
 - Made VSC the only default library; removed the TFM registration, documented optional independent libraries and canonical propagation, and generalized the pin helper and initializer.

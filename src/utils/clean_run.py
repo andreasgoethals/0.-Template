@@ -15,13 +15,15 @@ run" should not silently throw it away.
 LISTS BY DEFAULT. The two mistakes are not symmetric: a listing you meant as a deletion costs one
 more command, and a deletion you meant as a listing costs the run.
 
-NEVER TOUCHES `data/raw/` or `checkpoints/` or `tfm-library/` — the inputs are irreplaceable and
+NEVER TOUCHES `data/raw/`, `checkpoints/` or library submodules — the inputs are irreplaceable and
 the weights are either downloaded or a training run to reproduce.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
+import stat
 from pathlib import Path
 
 from src.utils.paths import outputs_dir, processed_dir, results_dir
@@ -34,11 +36,11 @@ KEEP = frozenset({".gitkeep", ".gitignore"})
 def roots(*, processed: bool = False) -> list[Path]:
     """Every tree to clear. Two `output/` roots on the cluster, one locally, plus the cache.
 
-    `results_dir()` is listed separately because on the cluster it is the one part of `output/`
-    on project storage — clearing only `outputs_dir()` there would leave the largest files behind.
+    The parent of `results_dir()` covers project storage's whole output tree, including
+    any extra reports a project placed alongside results.
     """
     found = [outputs_dir()]
-    results = results_dir()
+    results = results_dir().parent
     if not results.is_relative_to(found[0]):
         found.append(results)
     if processed:
@@ -46,11 +48,37 @@ def roots(*, processed: bool = False) -> list[Path]:
     return found
 
 
+def inventory(root: Path) -> list[Path]:
+    """Validate the entire tree before deletion; refuse links, junctions and unknown roots."""
+    root = root.absolute()
+    allowed = [p.absolute() for p in roots(processed=True)]
+    if root not in allowed:
+        raise ValueError(f"Not a cleanup target: {root}")
+    def reject_link(path: Path) -> None:
+        if path.is_symlink() or (
+            path.exists() and getattr(path.lstat(), "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        ):
+            raise ValueError(f"Cleanup refuses linked path: {path}")
+
+    for parent in (root, *root.parents):
+        reject_link(parent)
+    entries = []
+    if root.exists() and not root.is_dir():
+        raise ValueError(f"Cleanup target is not a directory: {root}")
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        for name in dirs + files:
+            path = Path(directory) / name
+            reject_link(path)
+            if not path.resolve().is_relative_to(root.resolve()):
+                raise ValueError(f"Cleanup path escapes target: {path}")
+            entries.append(path)
+    return entries
+
+
 def measure(root: Path) -> tuple[int, int]:
     """(files, bytes) under a root, ignoring the structure markers."""
-    if not root.is_dir():
-        return 0, 0
-    files = [p for p in root.rglob("*") if p.is_file() and p.name not in KEEP]
+    files = [p for p in inventory(root) if p.is_file() and p.name not in KEEP]
     return len(files), sum(p.stat().st_size for p in files)
 
 
@@ -62,14 +90,13 @@ def wipe(root: Path) -> int:
     (`figures/<notebook>/`) that do not. An `rmtree` of the subtree would take
     `output/figures/.gitkeep` with it, and the next clone would have nowhere to write.
     """
-    if not root.is_dir():
-        return 0
+    entries = inventory(root)
     removed = 0
-    for path in root.rglob("*"):
+    for path in entries:
         if path.is_file() and path.name not in KEEP:
             path.unlink()
             removed += 1
-    for path in sorted((p for p in root.rglob("*") if p.is_dir()),
+    for path in sorted((p for p in entries if p.is_dir()),
                        key=lambda p: len(p.parts), reverse=True):
         if not any(path.iterdir()):
             path.rmdir()
@@ -94,9 +121,12 @@ def main(argv: list[str] | None = None) -> int:
         total_bytes += size
         state = f"{files:>6} files  {size / 1e6:>9.1f} MB" if files else "         empty"
         print(f"  {state}  {root}")
+        for path in inventory(root):
+            if path.is_file() and path.name not in KEEP:
+                print(f"    {path}")
 
     print(f"\nTOTAL: {total_files} files, {total_bytes / 1e9:.2f} GB")
-    print("Never touched: data/raw/, checkpoints/, tfm-library/.")
+    print("Never touched: data/raw/, checkpoints/, library submodules.")
 
     if not args.clean:
         if total_files:

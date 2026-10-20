@@ -4,7 +4,7 @@ THE ONLY MODULE THAT BUILDS A PATH — everything else asks this one. A path ass
 site with `"output/" + name` is correct on a laptop and wrong on the cluster, and the failure
 shows up as a full quota or an empty results directory hours into a job.
 
-        project storage  /lustre1/project/stg_00211/<Project>/  big files, LOW INODES
+    project storage  <configured staging root>/<Project>/  big files
     personal data    $VSC_DATA/<Project>/                   repo + output/, backed up, 75 GiB
     scratch          $VSC_SCRATCH/                          purged after 30 days of no ACCESS
 
@@ -24,14 +24,11 @@ mean two code paths, and the one that only runs on the cluster is the one that b
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 #: Filled in by `_template/init_project.py`. The per-project folder name on BOTH shared tiers.
 PROJECT_NAME = "{{PROJECT_NAME}}"
-
-#: Fallback for project storage when the site variable is not set. The literal path is a
-#: last resort, not the primary source — VSC has moved it before.
-STAGING_FALLBACK = "/lustre1/project/stg_00211"
 
 #: `parents[2]` because this file is `<root>/src/utils/paths.py`. From __file__, not the working
 #: directory, so a script, a test and a notebook agree wherever they were launched from.
@@ -44,7 +41,10 @@ STAGING_ENV_VARS = ("{{PROJECT_UPPER}}_STAGING_ROOT", "VSC_STAGING_ROOT")
 
 def _env_path(name: str) -> Path | None:
     value = os.environ.get(name)
-    return Path(value) if value else None
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else REPO_ROOT / path
 
 
 # ---------------------------------------------------------------------------
@@ -85,11 +85,11 @@ def staging_root() -> Path:
     override = staging_override()
     if override:
         return override
-    lustre = _env_path("VSC_PROJECT_LUSTRE1")
-    if lustre:
-        return lustre / "stg_00211"
     if on_vsc():
-        return Path(STAGING_FALLBACK)
+        raise ValueError(
+            f"Set {STAGING_ENV_VARS[0]} or VSC_STAGING_ROOT to your allocated "
+            "project-storage directory (the project name is appended automatically)."
+        )
     return REPO_ROOT
 
 
@@ -115,12 +115,12 @@ def _under(root: Path, *parts: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# output/ — the single root for everything the code generates.
+# output/ — disposable reports, logs and results; caches and weights have separate roots.
 # ---------------------------------------------------------------------------
 
 
 def outputs_dir() -> Path:
-    """THE root for generated files; nothing generated is written outside it.
+    """The personal-tier root for reports and logs; big results use results_dir().
 
     Locally `<repo>/output/`, on the cluster `$VSC_DATA/<Project>/output/`. One root means "what
     did this run produce?" and "what can I delete?" have one answer each.
@@ -155,7 +155,14 @@ def figures_dir(notebook: str | None = None) -> Path:
     """`output/figures/`, or one notebook's own folder — a notebook clears its own before drawing
     and must not be able to reach another's."""
     root = outputs_dir() / "figures"
-    return root / notebook if notebook else root
+    if notebook:
+        if Path(notebook).name != notebook or notebook in {".", ".."} or "\\" in notebook:
+            raise ValueError("Notebook identifiers must be plain file stems.")
+        folder = root / notebook
+        if folder.resolve().parent != root.resolve():
+            raise ValueError("Notebook folder escapes output/figures.")
+        return folder
+    return root
 
 
 def captions_path() -> Path:
@@ -181,7 +188,7 @@ def raw_dir(*parts: str) -> Path:
 
 
 def processed_dir(*parts: str) -> Path:
-    """`data/processed/` — a cache. Regenerable, so it is the first thing to delete."""
+    """`data/processed/` — rebuildable cache, removed only with cleanup's --processed."""
     if _use_staging():
         return _under(staging_root(), "data", "processed", *parts)
     return REPO_ROOT.joinpath("data", "processed", *parts)
@@ -255,12 +262,13 @@ def resolve_writable(preferred: Path, fallback: Path | None = None) -> Path:
     directory on a shared tier can exist and still be unwritable. A completed run in the wrong
     place beats a job that died at hour six with nothing to show.
     """
-    fallback = fallback or (data_root() / PROJECT_NAME / "fallback")
+    fallback = fallback or (outputs_dir() / "fallback")
     try:
         preferred.mkdir(parents=True, exist_ok=True)
-        probe = preferred / ".write_probe"
-        probe.write_text("ok", encoding="utf-8")
-        probe.unlink()
+        # A unique probe cannot overwrite another run's file.
+        with tempfile.TemporaryFile(dir=preferred) as probe:
+            probe.write(b"ok")
+            probe.flush()
         return preferred
     except OSError as exc:
         print(
