@@ -14,8 +14,7 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": ["tests"],
 
-  // Ruff for both linting and formatting, so the editor agrees with `scripts/check.py`.
-  // An editor that formats differently from CI turns every commit into a diff of whitespace.
+  // Ruff for both linting and formatting, using the configuration in pyproject.toml.
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
@@ -27,13 +26,13 @@
   // 100 columns, matching [tool.ruff] line-length in pyproject.toml.
   "editor.rulers": [100],
 
-  // Notebooks run from the repository root, the same as `scripts/run_notebooks.py` does.
+  // Notebooks run from the repository root, as `python -m src.utils.run_notebooks` does.
   // Without this a notebook's cwd is notebooks/ and `from src...` fails only interactively —
   // the worst kind of difference, because interactive is where figures are iterated on.
   "jupyter.notebookFileRoot": "${workspaceFolder}",
 
-  // Never index or search these. tfm-library/ is a 749 MB read-only submodule; output/ is
-  // regenerated. Searching them buries every real result.
+  // Exclude shared reference libraries from ordinary project-code searches and analysis.
+  // Read them explicitly when reviewing research or infrastructure guidance.
   "files.exclude": {
     "**/__pycache__": true,
     "**/.pytest_cache": true,
@@ -41,16 +40,23 @@
   },
   "search.exclude": {
     "tfm-library": true,
+    "vsc-library": true,
+    "decision-models-library": true,
     "output": true,
     "data": true,
     ".venv": true
   },
-  "python.analysis.exclude": ["tfm-library", "output", "data"],
+  "python.analysis.exclude": ["tfm-library", "vsc-library", "decision-models-library", "output", "data"],
 
-  // The submodule is READ-ONLY by rule. This makes the editor enforce what the rule asks,
-  // so an accidental edit there is not even possible.
+  // Editor protection supports the read-only contract; it is not a filesystem permission.
   "files.readonlyInclude": {
-    "tfm-library/**": true
+    "tfm-library/**": true,
+    "vsc-library/**": true,
+    "decision-models-library/**": true
+  },
+  "files.readonlyExclude": {
+    "tfm-library/PROJECT_SPECIFIC.md": true,
+    "decision-models-library/PROJECT_SPECIFIC.md": true
   },
 
   "files.eol": "\n",

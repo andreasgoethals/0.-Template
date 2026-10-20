@@ -13,8 +13,8 @@ one interpreter would capture each other's figures — silently, giving plausibl
 attributed to the wrong notebook.
 
 A FLATTENED SCRIPT, NOT A JUPYTER KERNEL: nothing extra to install, identical on the cluster,
-and a traceback points at a line number instead of a cell index. Magics are stripped, which is
-deliberate — a notebook needing one cannot be executed non-interactively at all.
+and a traceback points at a line number instead of a cell index. This lightweight runner strips
+magics; notebooks that depend on them need a real Jupyter kernel runner.
 
 THE RUNNER DOES NOT SAVE FIGURES; each notebook does, through `FigureSaver`, so an interactive
 *Run All* produces exactly the same PDFs. The runner adds parallelism and the two documents.
@@ -94,8 +94,7 @@ def _build_script(nb_path: Path, text_path: Path) -> str:
             continue
         source = "".join(cell.get("source", []))
         # Strip IPython magics and shell escapes: they are syntax errors in a plain
-        # interpreter. A notebook that depends on one cannot be run non-interactively,
-        # which the compliance rules already forbid.
+        # interpreter. Notebooks must not depend on these under this runner.
         source = re.sub(r"^\s*[%!].*$", "", source, flags=re.M)
         body = "\n".join(f"    {line}" for line in source.split("\n"))
         parts.append(f"\n    # ---- cell {i} ----\n{body}\n")

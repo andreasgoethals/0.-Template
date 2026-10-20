@@ -48,7 +48,7 @@ For a project without VSC Library, this is the complete registration example:
 ```powershell
 git submodule add -b main https://github.com/andreasgoethals/VSC_Library.git vsc-library
 git add -- .gitmodules vsc-library
-git commit -m "Add VSC Library reference"
+git commit --only -m "Add VSC Library reference" -- .gitmodules vsc-library
 git push
 ```
 

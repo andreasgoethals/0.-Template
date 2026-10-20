@@ -4,11 +4,12 @@ THE ONLY MODULE THAT BUILDS A PATH — everything else asks this one. A path ass
 site with `"output/" + name` is correct on a laptop and wrong on the cluster, and the failure
 shows up as a full quota or an empty results directory hours into a job.
 
-        project storage  /lustre1/project/stg_00211/<Project>/  big files, backed up, LOW INODES
+        project storage  /lustre1/project/stg_00211/<Project>/  big files, LOW INODES
     personal data    $VSC_DATA/<Project>/                   repo + output/, backed up, 75 GiB
     scratch          $VSC_SCRATCH/                          purged after 30 days of no ACCESS
 
-Both tiers are backed up. They differ in size and in convenience: `$VSC_DATA` is only 75 GiB but
+Verify the allocation's project-storage protection policy in the VSC guidance.
+The tiers differ in size and in convenience: `$VSC_DATA` is only 75 GiB but
 can be browsed directly, while project storage is large but has to be pulled down locally first
 (PowerShell, `scp`/`rsync`) before you can look at anything in it.
 
@@ -80,7 +81,7 @@ def _use_staging() -> bool:
 
 
 def staging_root() -> Path:
-    """Project storage — the big, unbacked-up tier."""
+    """Project storage for big files; protection depends on the allocation."""
     override = staging_override()
     if override:
         return override

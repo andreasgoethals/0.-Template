@@ -3,7 +3,8 @@
 # {{PROJECT_NAME}} — SLURM job template.
 #
 # Copy this per experiment; do not parameterise one script into unreadability.
-#   sbatch scripts/slurm/job.slurm
+#   mkdir -p output/logs
+#   sbatch scripts/slurm/job.slurm python -m <your_project_entrypoint>
 #
 # THIS IS BASH ON LINUX, not PowerShell. `&&` is fine here.
 #
@@ -19,17 +20,17 @@
 # Uncomment for a GPU partition:
 ##SBATCH --gpus-per-node=1
 
-# Logs go under output/logs/ on $VSC_DATA, NOT next to the submitting directory. WHY: the
-# repository is on the backed-up tier, and after a requeue SLURM writes to a different file
-# — a log the code controls is the one that survives the job that produced it.
-#SBATCH --output=%x_%j.out
-#SBATCH --error=%x_%j.err
-
-# Ask for SIGUSR1 five minutes before the walltime kill, so a long run can checkpoint and
-# requeue itself instead of being lost. See docs/VSC.md § Outliving the walltime.
-#SBATCH --signal=B:USR1@300
+# Submit from the repository root and create output/logs BEFORE sbatch opens these files.
+#SBATCH --output=output/logs/%x_%j.log
+#SBATCH --error=output/logs/%x_%j_error.log
+#SBATCH --open-mode=append
 
 set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+    echo "Supply this project's compute command after job.slurm; see docs/VSC.md." >&2
+    exit 2
+fi
 
 PROJECT="{{PROJECT_NAME}}"
 REPO="$VSC_DATA/$PROJECT"
@@ -42,20 +43,7 @@ cd "$REPO"
 # found six months later is a run that did not happen.
 python -c "from src.utils.paths import describe; [print(f'{k:>16}: {v}') for k, v in describe().items()]"
 
-# --- resume-on-signal --------------------------------------------------------
-# Trap USR1, let the training loop finish its checkpoint, then requeue. The job comes back
-# with the same ID and resumes from the pointer it wrote.
-checkpoint_and_requeue() {
-    echo "$(date) received USR1 — checkpointing and requeueing job $SLURM_JOB_ID"
-    # The application writes its own checkpoint on SIGUSR1; give it a moment to finish.
-    sleep 30
-    scontrol requeue "$SLURM_JOB_ID"
-}
-trap checkpoint_and_requeue USR1
-
-# --- the actual work ---------------------------------------------------------
-# TODO replace with this project's entry point. `&` plus `wait` is required, not stylistic:
-# a foreground process makes bash defer the trap until it exits, so the signal would arrive
-# only after the job was already killed.
-srun python -m src.utils.run_notebooks &
-wait
+# Automatic checkpoint/requeue is deliberately not implemented: the application must
+# confirm a complete checkpoint before a requeue. B:USR1 signals only the batch shell,
+# not the training process. See docs/VSC.md before adding a project-specific protocol.
+srun "$@"

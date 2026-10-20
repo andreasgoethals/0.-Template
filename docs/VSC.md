@@ -79,7 +79,8 @@ The venv lives on `$VSC_DATA`: it must survive the scratch purge and be backed u
 ## Submitting
 
 ```bash
-sbatch --clusters=wice scripts/slurm/job.slurm
+mkdir -p output/logs
+sbatch --clusters=wice scripts/slurm/job.slurm python -m <your_project_entrypoint>
 squeue --clusters=all --me
 sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,MaxRSS,ExitCode
 scancel <jobid>
@@ -106,10 +107,16 @@ otherwise a total loss.
    the previous complete checkpoint rather than a truncated one.
 2. On start, read the pointer and resume. A fresh run and a resumed run take the **same code
    path** — a resume path only exercised after a crash is a resume path that does not work.
-3. Requeue rather than resubmitting by hand: `#SBATCH --signal=B:USR1@300` gives SIGUSR1 five
-   minutes before the kill. Trap it, checkpoint, then `scontrol requeue $SLURM_JOB_ID`.
-4. Make each step idempotent: re-running a completed step overwrites its own output rather than
-   appending, so a requeue never doubles a result file.
+3. Add requeue handling only after implementing and testing the application's checkpoint
+   protocol. `#SBATCH --signal=B:USR1@300` signals only the batch shell, not the application;
+   forwarding the request and confirming a complete checkpoint are the project's responsibility.
+   A fixed sleep is not confirmation. Requeue only after a successful checkpoint, with bounded
+   retries and a verified resume path. See the [Slurm signal documentation](https://slurm.schedmd.com/sbatch.html#OPT_signal).
+4. Make each step idempotent: a completed result is reused or replaced atomically, so a retry
+   never doubles a result file. Protect artifacts that cost a training run or paid call.
+
+The supplied job script does not automatically checkpoint or requeue. It runs the explicit
+compute command supplied after the script name and preserves its exit status.
 
 ## Getting results back, and cleaning up
 
@@ -128,5 +135,6 @@ python -m src.utils.clean_run --clean               # wipe output/ on both tiers
 python -m src.utils.clean_run --clean --processed    # ...and the data/processed cache
 ```
 
-One invocation covers `$VSC_DATA` and project storage, and it can never remove `data/raw/`,
-`checkpoints/`, or `tfm-library/` — it only ever looks inside `output/`.
+The default cleanup targets generated `output/` on both tiers. `--processed` additionally
+targets `data/processed/`; raw data, checkpoints and library submodules are outside those
+targets. Preview before applying, and keep irreplaceable artifacts outside cleanup targets.

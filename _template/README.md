@@ -42,7 +42,10 @@ a wrong partition name fails at submit time, a `TODO` fails at read time.
 
 Replaces every `{{PLACEHOLDER}}` with a real value and prints the steps it deliberately does not
 take. It installs nothing, makes no Git changes, pushes nothing, and does not delete this folder.
-`--dry-run` shows the file list first.
+`--dry-run` validates replacements and shows the file list without writing.
+Unknown placeholders stop initialization before any file changes. TOML and notebook
+JSON strings are escaped and parsed before writing; submodules, nested repositories,
+virtual environments and linked directories are excluded.
 
 | Placeholder | Becomes |
 |---|---|
@@ -71,14 +74,16 @@ Work in this order, and stop after step 1 to show me the plan before moving anyt
 
 1. Inventory. List what exists against the structure in TEMPLATE.md: what is
    missing, what is misplaced, what exists under another name.
-2. output/. Create it and move every generated artefact under it. This is the
-   biggest change and it breaks imports, so do it first, then fix the call sites.
-3. src/utils/paths.py. Copy it from the template, set PROJECT_NAME, then replace
+2. Classify outputs first: distinguish reproducible reports, expensive checkpoints,
+   paid responses and immutable inputs. Preserve existing artifacts and resume
+   contracts. Propose output-layout changes before moving files.
+3. src/utils/paths.py. Compare it with the template, then replace
    every hard-coded path with a call to it. Grep for string literals containing
    "/", "output", "results", "figures", "logs".
-4. The rest of src/utils/ and src/visualize/ — copy from the template, do not
-   rewrite. scripts/ keeps only the real experiments and the slurm files; move
-   every utility (cleanup, notebook runner, submodule pin) into src/utils/.
+4. Compare the remaining src/utils/ and src/visualize/ files with the template.
+   Adopt compatible generic improvements; do not overwrite project-specific
+   configuration, checkpointing, cleanup or notebook behavior with simpler defaults.
+   Document deliberate deviations. Utilities normally belong in src/utils/.
 5. Notebooks. Move every def and class into src/. Make each notebook clear its own
    figures, save through FigureSaver, and end by printing a section-by-section
    text summary.

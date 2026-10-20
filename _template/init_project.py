@@ -8,16 +8,20 @@ No copying: this repository already *is* the template, so the whole job is to re
 `{{PLACEHOLDER}}` in every text file with a real value, and print the steps it deliberately does
 not take.
 
-IT RUNS NOTHING ELSE — no install, no git, no push, and it does not delete `_template/` for you.
+No installs or Git changes; it only reads Git metadata and does not delete `_template/` for you.
 Each of those reaches outside this directory or throws files away, so each is printed instead.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
+import stat
 import subprocess
 import sys
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -105,8 +109,7 @@ def derive(project: str, args: argparse.Namespace) -> dict[str, str]:
     today = date.today()
     return {
         "PROJECT_NAME": project,
-        # The distribution name: lower-case, alphanumerics only. PEP 508 forbids a leading
-        # digit and pip's error for a bad name is obscure, so it is normalised here.
+        # Use a lower-case alphanumeric distribution name consistently.
         "PACKAGE_NAME": re.sub(r"[^a-z0-9]", "", project.lower()),
         # Environment-variable prefix, e.g. CREDITICL_STAGING_ROOT.
         "PROJECT_UPPER": re.sub(r"[^A-Z0-9]", "_", project.upper()),
@@ -126,38 +129,69 @@ def derive(project: str, args: argparse.Namespace) -> dict[str, str]:
 
 
 def text_files() -> list[Path]:
-    """Every substitutable file in the repository, `_template/` excluded."""
+    """Discover project text without descending into submodules, environments or links."""
     found = []
-    for path in sorted(REPO_ROOT.rglob("*")):
-        if not path.is_file():
-            continue
-        relative_parts = path.relative_to(REPO_ROOT).parts
-        if SKIP_DIRS & set(relative_parts[:-1]):
-            continue
-        if path.suffix.lower() in TEXT_SUFFIXES or path.name.startswith("."):
-            found.append(path)
-    return found
+    submodules = set()
+    for line in git("config", "--file", ".gitmodules", "--get-regexp",
+                    r"^submodule\..*\.path$").splitlines():
+        _, _, value = line.partition(" ")
+        if value:
+            submodules.add((REPO_ROOT / value).resolve())
+    for directory, dirs, files in os.walk(REPO_ROOT, followlinks=False):
+        base = Path(directory)
+        dirs[:] = [
+            name for name in dirs
+            if name not in SKIP_DIRS
+            and not (base / name).is_symlink()
+            and not (
+                getattr((base / name).lstat(), "st_file_attributes", 0)
+                & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+            )
+            and not (base / name / ".git").exists()
+            and not (base / name / "pyvenv.cfg").exists()
+            and (base / name).resolve() not in submodules
+        ]
+        for name in files:
+            path = base / name
+            if not path.is_symlink() and (
+                path.suffix.lower() in TEXT_SUFFIXES or path.name.startswith(".")
+            ):
+                found.append(path)
+    return sorted(found)
 
 
 def substitute(values: dict[str, str], *, dry_run: bool) -> tuple[list[str], list[str]]:
-    """Fill in every placeholder. Returns (files changed, leftover placeholders)."""
+    """Preflight every replacement before writing. Return (planned files, unknown tokens)."""
     changed: list[str] = []
     leftovers: list[str] = []
+    pending: list[tuple[Path, str]] = []
     for path in text_files():
         try:
             original = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue  # binary despite the name; leave it exactly as it is
-        replaced = PLACEHOLDER_RE.sub(lambda m: values.get(m.group(1), m.group(0)), original)
+        # The template's TOML placeholders occur in basic strings; notebook values
+        # occur in JSON strings. Escape their contents rather than inserting raw quotes.
+        escaped = (
+            {key: json.dumps(value, ensure_ascii=False)[1:-1] for key, value in values.items()}
+            if path.suffix.lower() in {".toml", ".ipynb"} else values
+        )
+        replaced = PLACEHOLDER_RE.sub(
+            lambda m, mapping=escaped: mapping.get(m.group(1), m.group(0)), original
+        )
         relative = str(path.relative_to(REPO_ROOT)).replace("\\", "/")
         if replaced != original:
             changed.append(relative)
-            if not dry_run:
-                # newline="" keeps the LF endings .gitattributes normalises to. Python would
-                # otherwise write CRLF on Windows, and a CRLF SLURM script fails on the
-                # cluster with a bare "$'\\r': command not found" that reads like a real bug.
-                path.write_text(replaced, encoding="utf-8", newline="")
+            if path.suffix.lower() == ".toml":
+                tomllib.loads(replaced)
+            elif path.suffix.lower() == ".ipynb":
+                json.loads(replaced)
+            pending.append((path, replaced))
         leftovers += [f"{relative}: {{{{{m.group(1)}}}}}" for m in PLACEHOLDER_RE.finditer(replaced)]
+    if not dry_run and not leftovers:
+        for path, replaced in pending:
+            # Preserve LF: CRLF Slurm scripts fail under bash on the cluster.
+            path.write_text(replaced, encoding="utf-8", newline="")
     return changed, leftovers
 
 
@@ -201,7 +235,7 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
      config/                    real configs; delete example.yaml.
      src/visualize/style.py     register this project's series names, once.
      notebooks/example_analysis.ipynb   the pattern to copy, then delete.
-     docs/CHANGELOG.md          the first entry is already dated {values["DATE"]}.
+     docs/CHANGELOG.md          add the first project entry dated {values["DATE"]}.
 
   6. First commit
 
@@ -247,22 +281,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {key:<18} {value}")
 
     changed, leftovers = substitute(values, dry_run=args.dry_run)
-    print(f"\n{len(changed)} files updated:")
+    print(f"\n{len(changed)} files {'planned' if args.dry_run or leftovers else 'updated'}:")
     for relative in changed:
         print(f"  {relative}")
 
     if leftovers:
         # A template bug, not a user error: a key exists that `derive()` does not produce.
-        print("\nWARNING: unsubstituted placeholders remain — this is a template bug:")
+        print("\nERROR: unknown placeholders — no files were changed:")
         for item in leftovers:
             print(f"  {item}")
+
+        return 1
 
     if args.dry_run:
         print("\nDry run. Re-run without --dry-run to apply.")
         return 0
 
     print(next_steps(args.project, values))
-    return 1 if leftovers else 0
+    return 0
 
 
 if __name__ == "__main__":

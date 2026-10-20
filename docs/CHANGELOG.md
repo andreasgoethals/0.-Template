@@ -2,6 +2,8 @@
 
 ## 20-10-2026
 
+- Fixed initializer escaping and preflight checks; aligned editor protection, library commands and Slurm guidance with the independent-library layout.
+
 - Made VSC the only default library; removed the TFM registration, documented optional independent libraries and canonical propagation, and generalized the pin helper and initializer.
 
 - Added the independent read-only VSC Library submodule and daily pin-update proposals; shared HPC guidance moved out of TFM Library, with project instructions retained in docs/VSC.md. No cluster workload was submitted.
@@ -26,9 +28,9 @@ Conventions:
 
 ---
 
-## {{DATE}}
+## New-project starting point
 
-- Repository created from
+- Record the new project's creation date and origin:
   [andreasgoethals/0.-Template](https://github.com/andreasgoethals/0.-Template).
-- `tfm-library/` added as a read-only submodule. Record the pin here whenever it moves,
+- `vsc-library/` is included as a read-only submodule; TFM and DM are optional. Record the pin here whenever it moves,
   because a result depends on the literature it was checked against.

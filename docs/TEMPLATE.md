@@ -121,7 +121,8 @@ Newest first, `DD-MM-YYYY`, and **short** — one line per run, four per dead en
 *before* starting and never deletes an entry: a run you would otherwise repeat and a dead end you
 already paid for are both evidence.
 
-It ships empty. Filling it is the project's job.
+The run table starts empty. Template-maintenance notes may already be present;
+record the new project's own runs and dead ends as work begins.
 
 ### `VSC.md`
 
@@ -143,8 +144,8 @@ go to project storage and everything you actually want to open stays on `$VSC_DA
 storage also has a **low inode budget** — few big files, not thousands of small ones.
 
 `$VSC_SCRATCH` is purged after 30 days **without access**, and `mv` and timestamp-preserving
-`rsync` do not count as an access. Compute nodes have **no outbound internet**, so anything that
-downloads happens on a login node first. Any run that can exceed the walltime must be resumable,
+`rsync` do not count as an access. Do not rely on outbound internet from compute nodes;
+stage dependencies using the current VSC guidance. Any run that can exceed the walltime must be resumable,
 writing its state pointer **last** so a job killed mid-write points at the previous complete
 checkpoint.
 
@@ -187,10 +188,9 @@ can read afterwards. So **log generously** — shapes, seeds, resolved paths, ti
 statistics, anything you would want when a run behaves oddly. Iterating on a run means reading the
 log with an LLM, and what was not printed cannot be diagnosed.
 
-One format, one extension, so "read the logs" is unambiguous. SLURM's own `.out`/`.err` files are a
-different thing — SLURM writes them wherever the job script points, and after a requeue it is a
-*different* file — which is exactly why the code writes its own `.log` here instead of relying on
-them.
+The example Slurm script also directs stdout and stderr here as `.log` files and appends across
+restarts. Create the directory before submission. Application logs should still record the run
+identity, resolved configuration and progress independently of scheduler output.
 
 ### `manifests/`
 
@@ -206,7 +206,8 @@ reach gigabytes and `$VSC_DATA` is 75 GiB. Locally it is a plain subdirectory.
 
 ### `figures/<notebook>/`
 
-**One PDF per figure, nothing else.** Vector, with text embedded as TrueType so journal systems
+**One PDF per figure**, plus the runner's `_figures.json` caption metadata and temporary
+`_stdout.txt` capture. Vector, with text embedded as TrueType so journal systems
 accept it. No PNG on disk: the notebook displays its figures inline, so there is no second raster
 copy to go stale. Sized for A4 — see `src/visualize/`.
 
@@ -247,8 +248,8 @@ The split is by *what a thing is for*, not by whether it happens to be runnable:
   `src/utils/`, invoked with `python -m`. None of it is the experiment, and putting it here would
   bury the two files that matter among eight that do not.
 
-`slurm/job.slurm` is a template with the walltime-resume pattern; copy it per experiment rather
-than parameterising one script into unreadability. Everything in `slurm/` is **bash on Linux**, so
+`slurm/job.slurm` is a minimal launcher requiring an explicit compute command. Checkpointing and
+requeue need a tested project-specific protocol; see `docs/VSC.md`. Everything in `slurm/` is **bash on Linux**, so
 normal POSIX syntax — unlike everything you type locally.
 
 ---
@@ -279,7 +280,7 @@ everywhere — and then it is identical, so do not rewrite it.
   list silently stops covering a notebook someone added.
 - **`update_library.py`** — *filled in.* Bumps this project's submodule pin; see below.
 - **`logging_setup.py`** — *filled in, minimal.* One logger, writing to the console **and** to
-  `output/logs/`. On the cluster stdout is a SLURM file that moves on requeue; a log the code
+  `output/logs/`. Scheduler stdout follows the submission settings; a log the code
   controls survives the job that produced it.
 - **`config.py`** — *empty.* How a project reads its configuration is its own business. The one ask:
   write the **resolved** config into `output/manifests/`.
@@ -362,7 +363,7 @@ For a project without VSC Library, this is the complete registration example:
 ```powershell
 git submodule add -b main https://github.com/andreasgoethals/VSC_Library.git vsc-library
 git add -- .gitmodules vsc-library
-git commit -m "Add VSC Library reference"
+git commit --only -m "Add VSC Library reference" -- .gitmodules vsc-library
 git push
 ```
 

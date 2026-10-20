@@ -1,8 +1,9 @@
-"""Bump this project's `vsc-library/` pin. REPORTS BY DEFAULT — changes nothing.
+"""Inspect or bump one registered library pin; VSC is the default. Reports without changes.
 
-    python -m src.utils.update_library                     what is pinned vs upstream
+    python -m src.utils.update_library                     local pin and checkout status
     python -m src.utils.update_library --update             fetch and move the working tree
     python -m src.utils.update_library --update --commit    ...and record the new pin
+    python -m src.utils.update_library --library tfm-library  select an optional library
 
 WHY THREE STEPS AND NOT ONE: `git submodule update --remote` moves the working tree but
 does NOT record the new pin — `git submodule status` then shows a leading `+`, which looks
@@ -10,11 +11,11 @@ like an error and is not. The pin only changes once the submodule path is added 
 committed. Doing that silently would move the literature a result was checked against
 without saying so, which is exactly the thing a pinned submodule exists to prevent.
 
-READ `vsc-library/CHANGELOG.md` BEFORE BUMPING. The point of the pin is that a result is
+READ THE SELECTED LIBRARY'S CHANGELOG BEFORE BUMPING. The point of the pin is that a result is
 reproducible against the literature as it stood; moving it is a decision, not maintenance.
 
-NOTHING INSIDE `vsc-library/` IS EVER WRITTEN by this script. It only moves which commit
-the submodule points at.
+The updater checks out upstream files at the selected revision; it never edits their content.
+It never pushes. With --commit it records only the selected submodule path.
 """
 
 from __future__ import annotations
@@ -62,16 +63,6 @@ def main(argv: list[str] | None = None) -> int:
     if not git("ls-files", "-s", "--", SUBMODULE).startswith("160000"):
         print(f"{SUBMODULE} is not registered. See docs/TEMPLATE.md.")
         return 1
-    if args.update:
-        if git("diff", "HEAD", "--", ".gitmodules"):
-            raise RuntimeError("Publish pending submodule registrations first")
-        if git("diff", "--cached", "--", SUBMODULE):
-            raise RuntimeError("Preserve the already-staged submodule pin")
-        result = subprocess.run(["git", "-C", str(REPO_ROOT / SUBMODULE),
-                                 "status", "--porcelain"], capture_output=True, text=True)
-        if result.returncode or result.stdout.strip():
-            raise RuntimeError("Initialize the submodule and preserve its local changes first")
-
     if not (REPO_ROOT / SUBMODULE).exists():
         print(f"{SUBMODULE}/ is missing. Add it with:")
         print(f"  git submodule add <library repo url> {SUBMODULE}")
@@ -82,8 +73,18 @@ def main(argv: list[str] | None = None) -> int:
         # A `-` prefix means the submodule is registered but never initialised: the folder
         # exists and is empty, which reads as "the library is missing" if you do not know this.
         print(f"{SUBMODULE}/ is not initialised (empty after a fresh clone). Run:")
-        print("  git submodule update --init")
+        print(f"  git submodule update --init -- {SUBMODULE}")
         return 1
+
+    if args.update:
+        if git("diff", "HEAD", "--", ".gitmodules"):
+            raise RuntimeError("Publish pending submodule registrations first")
+        if git("diff", "--cached", "--", SUBMODULE):
+            raise RuntimeError("Preserve the already-staged submodule pin")
+        result = subprocess.run(["git", "-C", str(REPO_ROOT / SUBMODULE),
+                                 "status", "--porcelain"], capture_output=True, text=True)
+        if result.returncode or result.stdout.strip():
+            raise RuntimeError("Initialize the submodule and preserve its local changes first")
 
     print(f"pinned now:  {line}")
     print(f"changelog:   {SUBMODULE}/CHANGELOG.md  <- read this before bumping")
@@ -101,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
             "\nThe working tree moved but THE PIN IS NOT RECORDED — the leading `+` above is\n"
             "that, not an error. To record it:\n"
             f"  git add {SUBMODULE}\n"
-            '  git commit -m "Bump vsc-library pin"'
+            f'  git commit --only -m "Bump {SUBMODULE} pin" -- {SUBMODULE}'
         )
         return 0
 

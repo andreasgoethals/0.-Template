@@ -17,9 +17,9 @@ authors = [{ name = "{{AUTHOR}}", email = "{{EMAIL}}" }]
 # version, because numerics that differ between two interpreters are a
 # reproducibility hazard nobody notices until a result will not replicate.
 #
-# VSC ships a small set of Python modules; 3.11 and 3.12 are both present and
-# both well covered by wheels. 3.13+ is excluded because scientific wheel
-# coverage there still lags, and a template must build on day one.
+# This template targets Python 3.11-3.12. Broaden that supported range only
+# after checking the project's dependencies and chosen cluster environment.
+# Verify currently available VSC modules when setting up each project.
 # ---------------------------------------------------------------------------
 requires-python = ">=3.11,<3.13"
 

@@ -2,6 +2,11 @@
 
 ## 20-10-2026
 
+- **Tried:** reviewed the inherited `B:USR1`, 30-second sleep and automatic requeue example.
+  **Result:** code review found no signal forwarding or checkpoint confirmation; no cluster job was run.
+  **Why:** `B:` signals only the batch shell; a delay is not a checkpoint acknowledgement.
+  **Instead:** use the explicit-command launcher; add requeue only with a tested application protocol.
+
 - Library maintenance now runs from the canonical `0. Literature` workspace. The template consumes only VSC; TFM and DM are optional. Consumer copies remain read-only.
 
 - Added the independent read-only VSC Library submodule and daily pin-update proposals; shared HPC guidance moved out of TFM Library, with project instructions retained in docs/VSC.md. No cluster workload was submitted.
