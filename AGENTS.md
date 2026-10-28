@@ -46,6 +46,14 @@ represent from how *often* it occurs; a library annotation from the primary sour
 Cluster runs cost real VSC credits. Installs change a shared environment. Pushes are
 {{AUTHOR}}'s action. Ask first.
 
+Once a campaign is authorized, optimize **time to verified results**, not token usage or
+minimum compute credits. Especially split independent CPU tests/evaluations into balanced
+jobs and submit ready shards together at the highest useful permitted concurrency: prefer
+ten roughly two-hour jobs over one twenty-hour job where separable. Follow the speed-first
+section of `docs/TEMPLATE.md`: measured resources, no duplicate work or shared-writer races,
+approved budget and site limits. Explain necessary serial stages; this grants no permission
+to submit new work or change scientific protocols.
+
 ## 5. Windows PowerShell 5.1 — no `&&`
 
 No `&&`, no ternary, no `??`. One command per line, or `;` with `if ($?) { ... }`:

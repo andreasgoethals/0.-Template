@@ -1,5 +1,10 @@
 # Changelog
 
+## 28-10-2026
+
+- Make VSC turnaround speed the priority: shard independent CPU work, submit ready jobs together, and document OnDemand/Slurm limits and safe parallel execution.
+- Make all three library registration/update paths explicit; align the launcher and VSC setup with current site guidance.
+
 ## 20-10-2026
 
 - Standardized the optional DM Library mountpoint as `dm-library` in helpers, initializer exclusions, editor settings and documentation.

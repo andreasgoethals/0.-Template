@@ -10,7 +10,34 @@ Check [upstream review flags](../vsc-library/UPSTREAM_CHANGES.md) and the
 
 How to run this project on the cluster. The authoritative cluster documentation is in the
 `vsc-library/` submodule — read it there and keep this file as *this project's* answer to it, not a
-copy. Fill in the `TODO`s the first time you submit.
+copy. Fill in the `TODO`s before the first submission.
+
+## Speed-first execution
+
+Follow [the speed-first policy in TEMPLATE.md](TEMPLATE.md#speed-first-execution-open-ondemand-and-slurm):
+minimize end-to-end turnaround, not tokens/credits, within the approved budget. Especially
+split long independent CPU tests/evaluations into balanced shards and submit them together.
+Open OnDemand apps use scheduled resources; an editor session is not the campaign runner.
+Use its login shell or SSH for batch submission, never for heavy computation. Leuven's
+Desktop app does not expose Slurm commands; use the login-shell feature instead.
+
+Record this project's measured choices here rather than inheriting arbitrary limits:
+
+| Decision | Project value |
+|---|---|
+| Independent work / shard map / merge check | TODO; preserve exact coverage and seeds |
+| Cluster, CPU partition and compatible environment | TODO |
+| Per-shard CPUs, peak RAM and walltime including setup margin | TODO; measure a representative shard |
+| Array size and maximum useful concurrency | TODO; current QoS/account limits and I/O capacity |
+| Observed queue + setup + execution + merge time | TODO; compare with serial execution |
+| Shared setup, output ownership and any unavoidable serial stage | TODO |
+
+For ten independent shards, `--array=0-9%10` permits up to ten concurrent tasks. The entrypoint
+must read `SLURM_ARRAY_TASK_ID`; applying this flag to an unsharded command merely repeats it.
+Use distinct `.log` paths such as `output/logs/%x_%A_%a.log`, and separate shard outputs.
+Use same-cluster `afterok` dependencies for preparation/merge; do not assume cross-cluster
+dependencies work. Query limits and inspect pending reasons with the commands in TEMPLATE.md.
+Do not choose a low concurrency cap merely to save credits, or a huge cap that slows shared I/O.
 
 **Log every run** in the Runs table of [`AGENTS_MEMORY.md`](AGENTS_MEMORY.md): one row with the
 config, the outcome and the headline number. That table is what stops a configuration being
@@ -28,9 +55,9 @@ resubmitted months after it already failed.
 ssh vsc<number>@login.hpc.kuleuven.be
 ```
 
-Do not rely on outbound internet access from compute nodes; stage required assets first. Anything that downloads — datasets, weights, a pip
-package — happens on a login node first. A job that fetches at runtime works locally and hangs
-here.
+Do not rely on outbound internet from compute nodes; stage required assets before execution.
+Use approved transfer/setup routes: only lightweight operations on login nodes, substantial
+builds or transfers in suitable allocations. Follow the library's software/storage guides.
 
 ## Storage — two tiers, one resolver
 
@@ -66,10 +93,15 @@ The same override supports an external drive locally:
 export {{PROJECT_UPPER}}_STAGING_ROOT=/some/other/place
 ```
 
+Set it inside the job script (or a project environment file sourced there), not just in the
+submission terminal: Leuven does not propagate arbitrary submission-shell variables by default.
+If using `--export`, preserve the site's minimal environment as documented in
+[Leuven Slurm](https://docs.vscentrum.be/leuven/slurm_specifics.html#environment-propagation).
+
 ## Environment
 
 ```bash
-module load Python/3.11.3-GCCcore-12.3.0      # TODO confirm against the current module list
+module load TODO_python_module             # select a compatible Python 3.11/3.12 module
 python -m venv $VSC_DATA/{{PROJECT_NAME}}/.venv
 source $VSC_DATA/{{PROJECT_NAME}}/.venv/bin/activate
 pip install -e ".[dev]"
@@ -83,14 +115,17 @@ The venv lives on `$VSC_DATA`: it must survive the scratch purge and be backed u
 mkdir -p output/logs
 sbatch --clusters=wice scripts/slurm/job.slurm python -m <your_project_entrypoint>
 squeue --clusters=all --me
-sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,MaxRSS,ExitCode
-scancel <jobid>
+sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,AllocCPUS,TotalCPU,MaxRSS,ExitCode
+scancel --clusters=wice <jobid>
 ```
 
 | Knob | Where | TODO |
 |---|---|---|
+| cluster | `--clusters` | `wice` or `mindwell`; use it explicitly for submission/cancellation |
 | partition | `#SBATCH --partition` | which partition this project uses |
-| walltime | `#SBATCH --time` | the limit on that partition |
+| CPU / RAM | `--cpus-per-task`, `--mem` | measured per-shard need, accounting for worker threads |
+| walltime | `#SBATCH --time` | realistic shard duration plus margin, within the partition limit |
+| array | `--array` | balanced shard IDs and useful concurrency, not sequential launches |
 | credits | `#SBATCH --account` | the credit account to charge |
 | GPUs | `#SBATCH --gpus-per-node` | what this project actually needs |
 
@@ -121,7 +156,7 @@ compute command supplied after the script name and preserves its exit status.
 
 ## Getting results back, and cleaning up
 
-Everything generated is under `output/` — one directory to copy, which is the point of that rule.
+Reports, logs and results are under `output/`; caches and checkpoints have separate roots.
 
 ```bash
 rsync -av vsc<number>@login.hpc.kuleuven.be:$VSC_DATA/{{PROJECT_NAME}}/output/ ./output/
@@ -138,4 +173,5 @@ python -m src.utils.clean_run --clean --processed    # ...and the data/processed
 
 The default cleanup targets generated `output/` on both tiers. `--processed` additionally
 targets `data/processed/`; raw data, checkpoints and library submodules are outside those
-targets. Preview before applying, and keep irreplaceable artifacts outside cleanup targets.
+targets. Stop writers before cleaning, preview before applying, and keep irreplaceable artifacts
+outside cleanup targets.
