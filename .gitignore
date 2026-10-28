@@ -40,6 +40,9 @@
 *.pth
 *.safetensors
 *.npz
+*.sif
+/runtimes/
+/cache/
 
 # --- Environments and tool caches -----------------------------------------
 # Unanchored on purpose: these appear at any depth and are never wanted anywhere.

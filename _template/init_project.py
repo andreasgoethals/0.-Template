@@ -44,7 +44,7 @@ TEXT_SUFFIXES = frozenset(
 #: Never touched. `_template/` is about to be deleted, and its own documentation quotes
 #: placeholders as examples, which substitution would destroy.
 SKIP_DIRS = frozenset({".git", "_template", "tfm-library", "vsc-library", "dm-library", ".venv", "venv", "__pycache__",
-                       ".pytest_cache", ".ruff_cache", "output", "data"})
+                       ".pytest_cache", ".ruff_cache", "output", "data", "runtimes", "cache"})
 
 #: Upper-case names only, never after a `$`: GitHub Actions expressions look like
 #: `${{ matrix.python-version }}`, which a naive substitution would destroy.
@@ -210,7 +210,7 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
 
      Remove-Item -Recurse -Force _template
 
-  2. Environment
+  2. Local environment (cluster runtimes go on PROJECT; see docs/VSC.md)
 
      python -m venv .venv
      .\\.venv\\Scripts\\Activate.ps1
@@ -225,12 +225,13 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
   4. Check it runs.
 
      python -m pytest -q
+     python -m ruff check .
      python -m src.utils.run_notebooks
 
   5. Make it yours
 
      README.md          replace everything ABOVE the last chapter. Keep that chapter.
-     docs/VSC.md        fill in the TODOs: partition, walltime, credit account.
+     docs/VSC.md        fill storage/runtime, resources, quotas and publication TODOs.
      scripts/slurm/job.slurm    the same TODOs.
      config/experiment0/        VSC validation configs; replace example.yaml.
      src/visualize/style.py     define this project's shared plotting style.
@@ -266,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not NAME_RE.match(args.project):
-        # The name becomes a directory on two cluster tiers, a distribution name and an
+        # The name becomes a storage directory, a distribution name and an
         # environment-variable prefix. A space or a dot fails in one of the three, usually last.
         raise SystemExit(
             f"invalid project name {args.project!r}: start with a letter, then letters, "

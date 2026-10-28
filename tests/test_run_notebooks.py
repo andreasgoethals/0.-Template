@@ -181,12 +181,8 @@ def test_empty_notebook_reports_clear_failure(isolated_output, monkeypatch):
 
 
 def test_partial_rerun_keeps_other_notebooks_reports(isolated_output, monkeypatch):
-    from concurrent.futures import ThreadPoolExecutor
-
     nb_dir = isolated_output / "notebooks"
     monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
-    # run_one still executes subprocesses; threads here let the discovery patch be shared.
-    monkeypatch.setattr(rn, "ProcessPoolExecutor", ThreadPoolExecutor)
     for name in ("experiment1/report", "experiment2/report"):
         make_notebook(nb_dir / f"{name}.ipynb", [f"print('summary {name}')"])
     assert all(r.ok for r in rn.run_all())
@@ -203,11 +199,8 @@ def test_end_to_end_a_notebook_saves_its_own_figure(isolated_output, monkeypatch
     """The property the whole design rests on: the NOTEBOOK writes the files, so a runner
     execution and an interactive Run All produce the same thing.
 
-    `run_one` plus the two writers rather than `run_all`: the process pool starts a fresh
-    interpreter that does not inherit monkeypatches, so a redirected `notebooks_dir` would
-    be invisible to it. Environment variables ARE inherited, which is how `isolated_output`
-    still keeps the figures out of the repository. `run_all` is exactly these three calls
-    plus the pool, and each is covered.
+    `run_one` executes a fresh interpreter; the storage environment is inherited so output
+    stays isolated. A separate test covers concurrent supervision and partial reports.
     """
     from src.utils.paths import REPO_ROOT, figures_dir
 
@@ -241,3 +234,14 @@ def test_end_to_end_a_notebook_saves_its_own_figure(isolated_output, monkeypatch
     rn.write_all_results((name,))
     assert "A line from (0,0) to (1,1)." in captions_path().read_text(encoding="utf-8")
     assert "SMOKE SUMMARY: 1 figure" in all_results_path().read_text(encoding="utf-8")
+
+
+def test_workers_use_all_allocated_cpus_without_a_four_worker_cap(monkeypatch):
+    monkeypatch.setattr(rn.os, "cpu_count", lambda: 32)
+    monkeypatch.delattr(rn.os, "sched_getaffinity", raising=False)
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "16")
+    assert rn.worker_count(20, None, 1) == 16
+    assert rn.worker_count(20, None, 2) == 8
+    assert rn.worker_count(20, 3, 2) == 3
+    with pytest.raises(ValueError, match="CPU budget"):
+        rn.worker_count(20, 9, 2)

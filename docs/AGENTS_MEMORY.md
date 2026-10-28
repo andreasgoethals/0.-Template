@@ -1,40 +1,18 @@
-# Agents' memory — runs and dead ends
+# Agent memory
 
-What is worth carrying between sessions: **the cluster runs that have been done**, and **the things
-that turned out not to work**. Read it before starting; add to it as you go.
-
-Not the changelog — that records edits to the repository. This records experience: what was run,
-what came out, and what is already known to fail.
-
-**Keep it as short as possible while retaining useful evidence.** Newest first, dates `DD-MM-YYYY`. Never
-delete an entry: a run you would otherwise repeat and a dead end you already paid for are both
-evidence.
+Read before working. Keep useful run evidence, failed attempts and other lessons compact and
+organized, newest first (`DD-MM-YYYY`). Preserve useful evidence; changes belong in CHANGELOG.md.
 
 ## Runs
 
-One row per cluster run worth remembering — which is most of them, because *"have we already tried
-that configuration?"* is the question this table exists to answer.
-
-| Date | Run | Outcome | Notes |
+| Date | Config / revision / job IDs | Outcome | Key result / evidence / next step |
 |---|---|---|---|
-| | | | |
 
-- **Run** — the config or arm, and the commit if it matters.
-- **Outcome** — `done` / `walltime` / `OOM` / `crashed` / `diverged` / `cancelled`.
-- **Notes** — one line: the headline number, the output path if it is worth finding again, or the
-  single thing the run showed. A number here saves re-reading the experiment's results.
+Submission is not completion; distinguish local checks, actual VSC runs and unresolved failures.
 
-## Dead ends
+## Lessons and dead ends
 
-Anything that cost more than a couple of minutes and did not work — including what you eventually
-fixed, because the fix is one changelog line and the dead end was the hour.
+For costly failed attempts, record **Tried**, **Result**, **Why**, **Instead**.
+Include reusable successes/operating decisions when they prevent repeated work.
 
-```
-### <short name for the attempt>
-- **Tried:** what was done.
-- **Result:** what happened — the error, the wrong number, the silent no-op.
-- **Why:** the underlying reason, once understood.
-- **Instead:** what to do, and the cheap check that would have caught it sooner.
-```
-
-_Nothing yet._
+_No project experience recorded yet._

@@ -8,8 +8,6 @@ environment variables rather than left untested until a job hits them.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from src.utils import paths
@@ -139,17 +137,17 @@ def test_data_search_paths_look_in_the_repo_first(tmp_path, monkeypatch) -> None
 def test_resolve_writable_probes_with_a_real_write(tmp_path) -> None:
     """`mkdir(exist_ok=True)` is not enough: a directory can exist and be unwritable."""
     good = tmp_path / "writable"
-    assert paths.resolve_writable(good, fallback=tmp_path / "fallback") == good
+    assert paths.resolve_writable(good) == good
     assert not (good / ".write_probe").exists()  # the probe cleans up after itself
 
 
-def test_resolve_writable_falls_back_rather_than_raising(tmp_path, capsys) -> None:
-    """A completed run in the wrong place beats a job that died at hour six."""
+def test_unwritable_destination_fails_without_creating_fallback(tmp_path) -> None:
+    """A failed destination must not redirect a large write into DATA."""
     blocked = tmp_path / "file_not_a_dir"
     blocked.write_text("in the way", encoding="utf-8")
-    fallback = tmp_path / "fallback"
-    assert paths.resolve_writable(blocked, fallback=fallback) == fallback
-    assert "WARNING" in capsys.readouterr().out  # silent fallback would be worse than none
+    with pytest.raises(OSError):
+        paths.resolve_writable(blocked)
+    assert not (tmp_path / "fallback").exists()
 
 
 def test_ensure_creates_the_parent_for_a_file_path(tmp_path) -> None:
@@ -161,19 +159,39 @@ def test_ensure_creates_the_parent_for_a_file_path(tmp_path) -> None:
 def test_describe_reports_every_root() -> None:
     """Logged at job start, so a run records where it actually wrote."""
     info = paths.describe()
-    for key in ("project", "on_vsc", "repo_root", "staging_root", "outputs_dir", "results_dir"):
+    for key in ("project", "on_vsc", "repo_root", "project_root", "outputs_dir", "results_dir"):
         assert key in info and info[key]
 
 
-def test_touch_tree_refreshes_access_times(tmp_path) -> None:
-    """Scratch is purged on ACCESS time, and `mv`/`rsync -a` do not count as an access."""
-    nested = tmp_path / "a" / "b"
-    nested.mkdir(parents=True)
-    f = nested / "x.txt"
-    f.write_text("x", encoding="utf-8")
-    import os
+def test_workspace_requires_scratch_on_vsc(tmp_path, monkeypatch):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+    with pytest.raises(ValueError, match="VSC_SCRATCH"):
+        paths.workspace_dir("job-1")
+    monkeypatch.setenv("VSC_SCRATCH", str(tmp_path / "scratch"))
+    assert paths.workspace_dir("job-1") == tmp_path / "scratch" / paths.PROJECT_NAME / "job-1"
 
-    old = 10_000_000
-    os.utime(f, (old, old))
-    paths.touch_tree(tmp_path)
-    assert Path(f).stat().st_atime > old
+
+@pytest.mark.parametrize("location", ["VSC_DATA", "VSC_HOME", "VSC_SCRATCH", "VSC_SCRATCH_NODE"])
+def test_project_cannot_be_redirected_into_other_tiers(tmp_path, monkeypatch, location):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv(location, str(tmp_path / location))
+    monkeypatch.setenv(paths.PROJECT_ENV_VARS[0], str(tmp_path / location / "assets"))
+    with pytest.raises(ValueError, match="separate"):
+        paths.runtimes_dir("image.sif")
+
+
+def test_runtime_cache_and_inputs_use_project_only(isolated_output, monkeypatch):
+    monkeypatch.setattr(paths, "REPO_ROOT", isolated_output / "checkout")
+    expected = isolated_output / "staging" / paths.PROJECT_NAME
+    assert paths.runtimes_dir("image.sif") == expected / "runtimes/image.sif"
+    assert paths.cache_dir("models") == expected / "cache/models"
+    local = paths.REPO_ROOT / "data/raw/example.csv"
+    local.parent.mkdir(parents=True)
+    local.write_text("stale DATA input")
+    assert paths.find_input("raw", "example.csv") is None
+
+
+def test_relative_project_root_is_rejected_on_vsc(isolated_output, monkeypatch):
+    monkeypatch.setenv(paths.PROJECT_ENV_VARS[0], "relative")
+    with pytest.raises(ValueError, match="absolute"):
+        paths.project_root()

@@ -10,17 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "{{AUTHOR}}", email = "{{EMAIL}}" }]
 
-# ---------------------------------------------------------------------------
-# WHY 3.11-3.12 and not open-ended.
-#
-# The local dev environment and the VSC environment must run the SAME minor
-# version, because numerics that differ between two interpreters are a
-# reproducibility hazard nobody notices until a result will not replicate.
-#
-# This template targets Python 3.11-3.12. Broaden that supported range only
-# after checking the project's dependencies and chosen cluster environment.
-# Verify currently available VSC modules when setting up each project.
-# ---------------------------------------------------------------------------
+# Record the exact runtime for reproducibility; validate dependencies before broadening support.
 requires-python = ">=3.11,<3.13"
 
 dependencies = [
@@ -43,15 +33,7 @@ dev = [
 [project.urls]
 Repository = "{{REPO_URL}}"
 
-# ---------------------------------------------------------------------------
-# Packaging: src/ is a flat package root (src/data, src/utils, src/visualize),
-# NOT a src/{{PACKAGE_NAME}}/ layout, because every script and notebook imports
-# `from src.utils.paths import ...`. Changing the layout breaks every import in
-# the repository, so it is fixed by the template.
-#
-# The excludes matter: without them, `pip install -e .` walks the read-only
-# literature submodule and the data directory looking for packages.
-# ---------------------------------------------------------------------------
+# Keep discovery inside our importable source; libraries/assets are not project packages.
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
@@ -81,9 +63,7 @@ ignore = [
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
-# WHY: without this, pytest walks library submodules and tries to collect the upstream
-# code snapshots as tests. It finds "test" in filenames there and fails on imports
-# of packages this project does not have.
+# Upstream snapshots and generated assets are not this project's tests.
 norecursedirs = ["tfm-library", "vsc-library", "dm-library", "output", "data", ".venv", "venv", "notebooks"]
 markers = [
     "slow: takes more than a few seconds",

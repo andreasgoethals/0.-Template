@@ -1,123 +1,44 @@
-# `_template/` — delete this folder
+# Repository template
 
-You are looking at **the repository template**. It is not a generator: it *is* a project with the
-name left blank, so a new project is this repository with `{{PROJECT_NAME}}` filled in and this
-folder removed. Nothing outside `_template/` depends on anything inside it.
+This repository is the project starting point, with placeholders. All portable rules and
+utilities are explained in [docs/TEMPLATE.md](../docs/TEMPLATE.md).
 
-Every rule and every file is explained in [`docs/TEMPLATE.md`](../docs/TEMPLATE.md).
+## New project
 
----
-
-## Starting a new project
-
-1. On GitHub, **Use this template** → new repository. Pick the visibility. Clone it.
-   (Not a fork: a fork of a public repository can never be made private.)
-2. Fill in the blanks, delete this folder, install, initialize VSC Library:
+1. GitHub **Use this template** → new public/private repository; clone it. Use a template,
+   not a fork of this public repository, when independent history/private visibility is needed.
+2. Fill placeholders:
 
 ```powershell
-python _template/init_project.py CreditICL --description "One sentence about the project."
+python _template/init_project.py ProjectName --description "One sentence about the project."
 ```
 
-```powershell
-Remove-Item -Recurse -Force _template
-```
+3. Remove `_template/`. With permission, install the project's dependencies into a local
+   environment. Initialize the reference with `git submodule update --init -- vsc-library`.
+4. Fill README, project style and VSC/runtime/resource TODOs. Start with experiment-0 validation;
+   the synthetic notebook only demonstrates reporting. Optional TFM/DM setup is in TEMPLATE.md.
+5. Run `python -m pytest -q`, `python -m ruff check .` and `python -m src.utils.run_notebooks`.
 
-```powershell
-pip install -e ".[dev]"
-```
+On VSC the Git checkout goes on DATA; environments/images and persistent assets go on PROJECT.
+Prefer compact immutable containers. Read the storage/concurrency policy before staging or submitting.
 
-```powershell
-git submodule update --init -- vsc-library
-```
+`init_project.py` substitutes project/package/author/date/URL placeholders, validating TOML and
+notebook JSON before writing. `--dry-run` previews. It skips libraries/assets/linked directories,
+installs nothing, makes no Git changes and deletes nothing. The uninitialized package name is
+intentionally not installable. After template edits, test an initialized throwaway copy.
 
-3. `python -m pytest -q` and `python -m src.utils.run_notebooks` should both pass.
+## Existing project
 
-Then fill in what a script cannot: `README.md` above its last chapter, the `TODO`s in
-`docs/VSC.md` and `scripts/slurm/job.slurm`, and this project's own look in
-`src/visualize/style.py` (the template fixes the A4 sizes; the colours and grid are yours — copying
-a similar project's `style.py` is the fastest start). Leave a `TODO` rather than a plausible guess:
-a wrong partition name fails at submit time, a `TODO` fails at read time.
-
-Use matching experiment folders in `config/`, `notebooks/` and `output/`; start with
-`experiment0` for VSC validation (optionally `0a`, `0b`, ...), then add research experiments.
-The included experiment-0 notebook is synthetic reporting, not a passed cluster test.
-See [the flexible guideline](../docs/TEMPLATE.md#experiments).
-
-### `init_project.py`
-
-Replaces every `{{PLACEHOLDER}}` with a real value and prints the steps it deliberately does not
-take. It installs nothing, makes no Git changes, pushes nothing, and does not delete this folder.
-`--dry-run` validates replacements and shows the file list without writing.
-Unknown placeholders stop initialization before any file changes. TOML and notebook
-JSON strings are escaped and parsed before writing; submodules, nested repositories,
-virtual environments and linked directories are excluded.
-
-| Placeholder | Becomes |
-|---|---|
-| `{{PROJECT_NAME}}` | `CreditICL` — the folder name on **both** cluster tiers, and all prose |
-| `{{PACKAGE_NAME}}` | `crediticl` — `pyproject.toml`, the SLURM job name |
-| `{{PROJECT_UPPER}}` | `CREDITICL` — the `CREDITICL_STAGING_ROOT` environment variable |
-| `{{DESCRIPTION}}` | one sentence — `README.md`, `pyproject.toml` |
-| `{{AUTHOR}}` `{{EMAIL}}` `{{YEAR}}` `{{DATE}}` | you, today |
-| `{{REPO_URL}}` | auto-detected from `origin`, so it is right even if the repo name differs |
-
-A leftover placeholder afterwards is a **template bug** — a key exists in a file that `derive()`
-does not produce.
-
----
-
-## Bringing the template to an existing repository
-
-Copy [`docs/TEMPLATE.md`](../docs/TEMPLATE.md) into that repository's `docs/`, then give an agent
-this:
+Copy `docs/TEMPLATE.md` into the project and give an agent this prompt:
 
 ```text
-Read docs/TEMPLATE.md. It is the layout and the rules this repository should follow —
-a starting point, not a contract. Bring the repository closer to it.
-
-Work in this order, and stop after step 1 to show me the plan before moving anything:
-
-1. Inventory. List what exists against the structure in TEMPLATE.md: what is
-   missing, what is misplaced, what exists under another name.
-2. Classify outputs first: distinguish reproducible reports, expensive checkpoints,
-   paid responses and immutable inputs. Preserve existing artifacts and resume
-   contracts. Propose output-layout changes before moving files.
-3. src/utils/paths.py. Compare it with the template, then replace
-   every hard-coded path with a call to it. Grep for string literals containing
-   "/", "output", "results", "figures", "logs".
-4. Compare the remaining src/utils/ and src/visualize/ files with the template.
-   Adopt compatible generic improvements; do not overwrite project-specific
-   configuration, checkpointing, cleanup or notebook behavior with simpler defaults.
-   Document deliberate deviations. Utilities normally belong in src/utils/.
-5. Notebooks. Move every def and class into src/. Make each notebook clear its own
-   figures, save through FigureSaver, and end by printing a section-by-section
-   text summary.
-6. docs/: .md only, CAPITALS, plus CHANGELOG.md, VSC.md, and AGENTS_MEMORY.md
-   (seed its Runs table from whatever cluster runs this project already has).
-   Then AGENTS.md at the root, and a CLAUDE.md whose only line is "@AGENTS.md"
-   (Claude Code imports it; configure other tools to read AGENTS.md as needed).
-7. Add vsc-library/ if absent. TFM and DM remain optional: add them only when
-   explicitly requested for this project. Follow docs/TEMPLATE.md for the
-   independent submodule URLs, read-only boundaries and update workflow.
-
-The template is at "C:\Users\U0152019\PhD Documents\Projects\0. Template" — copy
-files from it rather than rewriting them.
-
-Then run python -m pytest -q and report the result, plus every deviation you left
-in place and why. Do not install, commit, or push without asking.
+Read docs/TEMPLATE.md and this project's agent instructions. Compare the existing repository
+with the template and propose a compact adoption plan first. Preserve scientific decisions,
+valuable outputs, resume paths and source/runtime revisions used by active or queued jobs.
+Adopt only useful compatible changes; document deliberate deviations. Never edit reference
+submodules. Ask before installs, submissions, migrations or publication unless already authorized.
+After approved edits, align docs and run relevant tests; distinguish local checks from VSC validation.
 ```
 
----
-
-## Notes on the template itself
-
-**It is not installable.** `pyproject.toml` has `name = "{{PACKAGE_NAME}}"`, not a valid PEP 508
-name, so `pip install -e .` fails here. Tests still run — `tests/conftest.py` puts the root on
-`sys.path`.
-
-**After changing anything here**, initialise a throwaway copy and run it, rather than trusting that
-it still works.
-
-**Keep it project-agnostic.** No project-specific dataset, model, experiment or result. Several files under
-`src/` ship deliberately empty; fill them only with broadly useful defaults that projects
-can adapt.
+Keep the template generic and concise. Submodule maintenance belongs in the canonical libraries;
+propagating TEMPLATE.md alone does not migrate downstream code or storage.

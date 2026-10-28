@@ -1,22 +1,15 @@
-"""Wipe what the previous run produced, so the next one starts clean.
+"""Preview or remove disposable run output; retained assets are never part of cleanup.
 
     python -m src.utils.clean_run                        list what is there, delete nothing
     python -m src.utils.clean_run --clean                 delete it
     python -m src.utils.clean_run --clean --processed      ...and the data/processed cache too
 
-Clears the **whole `output/` tree on both storage tiers** — `$VSC_DATA` and project storage — so
-one invocation is enough whether you are on a laptop or on the cluster. Off-cluster both tiers
-collapse into the repository and it is simply `output/`.
+Clears disposable output across experiments on both tiers. Retained results, submission
+receipts and workspaces are protected. Scratch needs a separate publication/ownership check.
 
-`--processed` additionally clears `data/processed/`, the preprocessing cache. It is separate
-because rebuilding that cache can cost far more than re-running the notebooks, so "clean the last
-run" should not silently throw it away.
-
-LISTS BY DEFAULT. The two mistakes are not symmetric: a listing you meant as a deletion costs one
-more command, and a deletion you meant as a listing costs the run.
-
-NEVER TOUCHES `data/raw/`, `checkpoints/` or library submodules — the inputs are irreplaceable and
-the weights are either downloaded or a training run to reproduce.
+`--processed` opts into rebuilding the preprocessing cache, which can be expensive.
+Listing is default because accidental deletion can lose a run. Raw inputs, weights, runtimes,
+reusable caches and library submodules are outside cleanup targets.
 """
 
 from __future__ import annotations
@@ -28,13 +21,14 @@ from pathlib import Path
 
 from src.utils.paths import outputs_dir, processed_dir, results_dir
 
-#: Tracked so an empty directory survives a clone. Not run output, so never counted or deleted —
-#: removing them would leave a fresh clone with nowhere to write.
+# Preserve tracked directory markers so a fresh clone retains its layout.
 KEEP = frozenset({".gitkeep", ".gitignore"})
+# Deleting receipts can duplicate submissions; results and resumable work are not disposable.
+PROTECTED = frozenset({"results", "submissions", "workspaces"})
 
 
 def roots(*, processed: bool = False) -> list[Path]:
-    """Every tree to clear. Two `output/` roots on the cluster, one locally, plus the cache.
+    """Output roots to inspect, with protected subtrees excluded, plus the opt-in cache.
 
     The parent of `results_dir()` covers project storage's whole output tree, including
     any extra reports a project placed alongside results.
@@ -67,7 +61,10 @@ def inventory(root: Path) -> list[Path]:
     if root.exists() and not root.is_dir():
         raise ValueError(f"Cleanup target is not a directory: {root}")
     for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [name for name in dirs if name not in PROTECTED]
         for name in dirs + files:
+            if name in PROTECTED:
+                continue
             path = Path(directory) / name
             reject_link(path)
             if not path.resolve().is_relative_to(root.resolve()):
@@ -83,13 +80,7 @@ def measure(root: Path) -> tuple[int, int]:
 
 
 def wipe(root: Path) -> int:
-    """Delete everything under a root except the structure markers. Returns files removed.
-
-    Two passes, and the order matters: files first, then empty directories bottom-up. That leaves
-    exactly the directories holding a tracked `.gitkeep` and removes the per-run ones
-    (`<experiment>/figures/<notebook>/`) that do not. An `rmtree` of the subtree would take
-    its `.gitkeep` markers with it, and the next clone would lose that structure.
-    """
+    """Remove files before empty directories, preserving protected subtrees and layout markers."""
     entries = inventory(root)
     removed = 0
     for path in entries:
@@ -126,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"    {path}")
 
     print(f"\nTOTAL: {total_files} files, {total_bytes / 1e9:.2f} GB")
-    print("Never touched: data/raw/, checkpoints/, library submodules.")
+    print("Protected: results/, submissions/, workspaces/, raw data, checkpoints, runtimes, libraries.")
 
     if not args.clean:
         if total_files:

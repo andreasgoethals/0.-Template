@@ -2,6 +2,7 @@
 
 ## 28-10-2026
 
+- Establish DATA/PROJECT/SCRATCH policy, PROJECT runtimes and protected retained results; remove fallback storage and arbitrary concurrency defaults, add resumable site-capacity submission, and compact the docs.
 - Add flexible experiment-first organization and staged VSC validation; support nested notebooks, isolated outputs and matching examples.
 - Make VSC turnaround speed the priority: shard independent CPU work, submit ready jobs together, and document OnDemand/Slurm limits and safe parallel execution.
 - Make all three library registration/update paths explicit; align the launcher and VSC setup with current site guidance.
@@ -18,29 +19,7 @@
 
 - Added the independent read-only VSC Library submodule and daily pin-update proposals; shared HPC guidance moved out of TFM Library, with project instructions retained in docs/VSC.md. No cluster workload was submitted.
 
-What changed in this repository. **One chapter per date, `DD-MM-YYYY`, newest at the
-top.** Terse: what changed, and why if it is not obvious. All rules and rule changes are
-recorded here.
+## New projects
 
-Edits to the repository. The runs and the dead ends go in
-[`AGENTS_MEMORY.md`](AGENTS_MEMORY.md) — keep them separate, mixing them makes both unreadable.
-
-Conventions:
-
-- **As short as possible.** What changed, plus the *why* only when it is not obvious from the
-  *what* — after an em dash. Most changes fit on one line; a genuinely large one can take more, but
-  it should still be the shortest version that is complete. The detail belongs in the commit, and a
-  changelog nobody skims is a changelog nobody reads.
-- **Newest date first.** A reader wants the current state, not the archaeology.
-- Dates are `DD-MM-YYYY`. Not ISO, not `Jan 5`. One format, sortable by eye.
-- Group a date's bullets under `### Added` / `### Changed` / `### Removed` / `### Fixed` only once
-  there are enough to need it.
-
----
-
-## New-project starting point
-
-- Record the new project's creation date and origin:
-  [andreasgoethals/0.-Template](https://github.com/andreasgoethals/0.-Template).
-- `vsc-library/` is included as a read-only submodule; TFM and DM are optional. Record the pin here whenever it moves,
-  because a result depends on the literature it was checked against.
+Start a project changelog with its creation date and template origin. Record substantive
+changes and library-pin updates briefly, newest dates first (`DD-MM-YYYY`).

@@ -58,14 +58,14 @@ def test_gitkeep_is_never_counted(isolated_output) -> None:
     assert clean_run.measure(clean_run.roots()[0]) == (0, 0)
 
 
-def test_both_storage_tiers_are_cleared_on_the_cluster(isolated_output) -> None:
-    """All experiments on both tiers must be cleared, while checkpoints remain protected."""
+def test_disposable_output_is_cleared_and_results_are_retained(isolated_output) -> None:
+    """Retained evidence must survive routine cleanup on both tiers."""
     from src.utils.paths import checkpoints_dir, logs_dir, results_dir
 
     roots = clean_run.roots()
     assert len(roots) == 2
     assert any("staging" in str(r) for r in roots)
-    victims = []
+    victims, retained = [], []
     for experiment in ("experiment0/0a", "experiment1"):
         for path in (
             logs_dir(experiment) / "run.log",
@@ -73,13 +73,20 @@ def test_both_storage_tiers_are_cleared_on_the_cluster(isolated_output) -> None:
         ):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("generated")
-            victims.append(path)
+            (retained if path.suffix == ".csv" else victims).append(path)
+    for root in roots:
+        for name in ("results", "manifests/submissions", "workspaces"):
+            path = root / name / "keep.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("preserve")
+            retained.append(path)
     checkpoint = checkpoints_dir("retained.bin")
     checkpoint.parent.mkdir(parents=True)
     checkpoint.write_text("expensive")
     for root in roots:
         clean_run.wipe(root)
     assert all(not path.exists() for path in victims)
+    assert all(path.exists() for path in retained)
     assert checkpoint.read_text() == "expensive"
 
 

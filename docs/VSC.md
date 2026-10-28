@@ -1,195 +1,142 @@
-# {{PROJECT_NAME}} on the KU Leuven VSC
+# {{PROJECT_NAME}} on VSC
 
-Shared infrastructure reference: [VSC Library](../vsc-library/README.md). The parent Git commit pins its revision; inspect it with `git submodule status -- vsc-library`.
-Its [official repository snapshot](<../vsc-library/VSC Repository.txt>),
-[guides](../vsc-library/guides/) and [Slurm templates](<../vsc-library/slurm templates/README.md>)
-are read-only. Keep this project's actual paths, environment, resource choices,
-submission/resume steps and run evidence in this file or the project's own run logs.
-Check [upstream review flags](../vsc-library/UPSTREAM_CHANGES.md) and the
-[live Leuven status](https://status.vscentrum.be/tier2_leuven.html) before applying a changed policy.
+Project policy: [TEMPLATE.md](TEMPLATE.md#vsc-storage-policy). Infrastructure reference:
+[VSC Library](../vsc-library/README.md), read-only at the parent's gitlink. Check its
+[review flags](../vsc-library/UPSTREAM_CHANGES.md) and [live status](https://status.vscentrum.be/tier2_leuven.html).
+Fill these project choices before submission; this file is a runbook, not a second VSC manual.
 
-How to run this project on the cluster. The authoritative cluster documentation is in the
-`vsc-library/` submodule — read it there and keep this file as *this project's* answer to it, not a
-copy. Fill in the `TODO`s before the first submission.
+## Project settings
 
-## Experiments and validation
-
-Follow [the experiment guideline](TEMPLATE.md#experiments): matching experiment folders
-under `config/`, `notebooks/` and `output/`. `experiment0` validates this project's behavior
-on the target VSC environment before research runs; split into `0a`, `0b`, ... as useful.
-The synthetic example notebook checks reporting locally and does not certify VSC behavior.
-
-TODO: list validation stages, commands, coverage and pass criteria here, including relevant
-CPU/GPU execution, output checks, resources and recovery. Keep independent checks parallel;
-record the tested source/config/environment and evidence paths in each stage's manifests.
-Link outcomes from `AGENTS_MEMORY.md`; revalidate affected behavior after changes. Explain
-any deliberate layout deviation without moving existing results or breaking resume paths.
-
-## Speed-first execution
-
-Follow [the speed-first policy in TEMPLATE.md](TEMPLATE.md#speed-first-execution-open-ondemand-and-slurm):
-minimize end-to-end turnaround, not tokens/credits, within the approved budget. Especially
-split long independent CPU tests/evaluations into balanced shards and submit them together.
-Open OnDemand apps use scheduled resources; an editor session is not the campaign runner.
-Use its login shell or SSH for batch submission, never for heavy computation. Leuven's
-Desktop app does not expose Slurm commands; use the login-shell feature instead.
-
-Record this project's measured choices here rather than inheriting arbitrary limits:
-
-| Decision | Project value |
+| Setting | Project value |
 |---|---|
-| Independent work / shard map / merge check | TODO; preserve exact coverage and seeds |
-| Cluster, CPU partition and compatible environment | TODO |
-| Per-shard CPUs, peak RAM and walltime including setup margin | TODO; measure a representative shard |
-| Array size and maximum useful concurrency | TODO; current QoS/account limits and I/O capacity |
-| Observed queue + setup + execution + merge time | TODO; compare with serial execution |
-| Shared setup, output ownership and any unavoidable serial stage | TODO |
+| DATA checkout, frozen revision and submodule pins | TODO; actual Git checkout including `.git` |
+| Shared PROJECT root per cluster | TODO; GPFS for intensive Mindwell I/O, Lustre for wICE |
+| Runtime specification, image hash / environment version | TODO; versioned PROJECT runtime |
+| Cluster, partition, account, QoS | TODO; query live site settings |
+| CPUs, host RAM, GPUs and walltime per task | TODO; measured requirement + startup/publication margin |
+| Independent shard map and genuine dependencies | TODO; exact coverage, unique outputs, validated merge |
+| Site pending+running ceiling and its scope; MaxArraySize | TODO; include applicable association/partition limits |
+| Validation stages, pass criteria and evidence paths | TODO; experiment0, optionally 0a/0b/... |
+| Publication/resume and scratch retirement checks | TODO; periodic publication, final verification, job ownership |
+| Byte/file quotas, backup destinations and restore procedure | TODO; independent backups of irreplaceable outputs |
 
-For ten independent shards, `--array=0-9%10` permits up to ten concurrent tasks. The entrypoint
-must read `SLURM_ARRAY_TASK_ID`; applying this flag to an unsharded command merely repeats it.
-Use distinct `.log` paths such as `output/experiment0/logs/%x_%A_%a.log`, and separate shard outputs.
-Use same-cluster `afterok` dependencies for preparation/merge; do not assume cross-cluster
-dependencies work. Query limits and inspect pending reasons with the commands in TEMPLATE.md.
-Do not choose a low concurrency cap merely to save credits, or a huge cap that slows shared I/O.
+## Checkout, assets and runtime
 
-**Log every run** in the Runs table of [`AGENTS_MEMORY.md`](AGENTS_MEMORY.md): one row with the
-config, the outcome and the headline number. That table is what stops a configuration being
-resubmitted months after it already failed.
+Clone/pull/update submodules **on DATA**. Preserve the revision and runtime of active or queued
+jobs; use a separate DATA checkout for changed code. Environment specifications belong in Git;
+installed environments and images belong on PROJECT. Never move a populated venv: recreate at
+its final destination, validate actual workloads and only then retire an unused original.
 
-## The machines
+Prefer an immutable Apptainer SIF containing the environment; build from a recorded definition
+and dependency specification on an allowed setup allocation. A versioned PROJECT venv/Conda
+environment is an alternative. Containers reduce small-file pressure; neither their compatibility
+nor their quota use is automatic. Check bytes and file counts (`myquota`, allocation-specific
+tools). Do not assume PROJECT has independent backups. Keep build caches temporary on SCRATCH.
 
-| Host | Role |
-|---|---|
-| **wICE login service** | Shared login nodes — editing, submission and small setup only. |
-| **wICE** | general-purpose compute partitions |
-| **Mindwell** | CPU, GPU, large-memory and interactive compute partitions |
-
-```bash
-ssh vsc<number>@login.hpc.kuleuven.be
-```
-
-Do not rely on outbound internet from compute nodes; stage required assets before execution.
-Use approved transfer/setup routes: only lightweight operations on login nodes, substantial
-builds or transfers in suitable allocations. Follow the library's software/storage guides.
-
-## Storage — two tiers, one resolver
-
-On **both** tiers everything lives inside a folder named after the project. Never build these
-paths by hand: `src/utils/paths.py` is the only module that constructs them, and it collapses both
-tiers to the repository root off-cluster, so the same code runs on a laptop unconfigured.
-
-| tier | path | holds | quota |
-|---|---|---|---|
-| **project storage** | `<configured staging root>/{{PROJECT_NAME}}/` | datasets, checkpoints, caches, **`output/<experiment>/results/`** | allocation-specific |
-| **personal data** | `$VSC_DATA/{{PROJECT_NAME}}/` | the repository, and the rest of `output/` | 75 GiB |
-| scratch | `$VSC_SCRATCH/` | working scratch only | **purged after 30 days** |
-
-- **Personal DATA is backed up; confirm the actual group-project storage protection policy.** They differ in size and in convenience: you can browse `$VSC_DATA`
-  directly, while anything on project storage has to be pulled down locally first (PowerShell,
-  `scp`/`rsync`) before you can look at it. So the big, rarely-read things go to project storage and
-  everything you actually want to open stays on `$VSC_DATA`.
-- `$VSC_DATA` is 75 GiB. One forgotten checkpoint directory fills it, and then every job that
-  writes a log fails too.
-- Project storage has a **low inode budget** — few big files, not a hundred thousand small ones.
-  Per-step records therefore go to `$VSC_DATA`.
-- Scratch's purge is on **access** time, and `mv` and timestamp-preserving `rsync` do **not** count
-  as an access, so freshly staged data can vanish almost immediately. Copy, then
-  verify the scratch copy using the current storage guide.
-- Use native **Lustre on wICE** and **GPFS on Mindwell** for intensive I/O; stage between them
-  before compute. P100/V100 nodes cannot access GPFS.
-
-Configure the allocated big-file tier before cluster use. No allocation is guessed.
-The project name is appended; supply the shared root, not the project directory.
-The same override supports an external drive locally:
+On the login shell, choose actual paths (examples are placeholders):
 
 ```bash
-export {{PROJECT_UPPER}}_STAGING_ROOT=/some/other/place
+cd "$VSC_DATA/{{PROJECT_NAME}}"
+PROJECT_ROOT=/allocated/native/shared/root
+RUNTIME="$PROJECT_ROOT/{{PROJECT_NAME}}/runtimes/runtime-v1.sif"
+REVISION=$(git rev-parse HEAD)
 ```
 
-Set it inside the job script (or a project environment file sourced there), not just in the
-submission terminal: Leuven does not propagate arbitrary submission-shell variables by default.
-If using `--export`, preserve the site's minimal environment as documented in
-[Leuven Slurm](https://docs.vscentrum.be/leuven/slurm_specifics.html#environment-propagation).
+The launcher receives these explicitly because Leuven does not propagate arbitrary exports.
+It sets `VSC_PROJECT_ROOT`; Python also accepts `{{PROJECT_UPPER}}_PROJECT_ROOT` and the legacy
+`*_STAGING_ROOT` aliases. Roots are shared; the resolver adds `{{PROJECT_NAME}}` exactly once.
+Do not leave a conflicting higher-priority override in the job environment.
 
-## Environment
+Native PROJECT assets may be read directly. Stage only needed cross-filesystem working sets;
+verify copies and database locking before compute. Preserve original inputs and checkpoints.
+No cluster downloads, environment installs or migrations are authorized just by this template.
 
-```bash
-module load TODO_python_module             # select a compatible Python 3.11/3.12 module
-python -m venv $VSC_DATA/{{PROJECT_NAME}}/.venv
-source $VSC_DATA/{{PROJECT_NAME}}/.venv/bin/activate
-pip install -e ".[dev]"
-```
+## Submit independent work
 
-The venv lives on `$VSC_DATA`: it must survive the scratch purge and be backed up, and it is small.
-
-## Submitting
+Fill `scripts/slurm/job.slurm` resource/module TODOs first. It expects a PROJECT SIF or absolute
+PROJECT environment interpreter, then Python arguments. GPU images need a compatible host
+driver and real GPU validation. The example starts with experiment-0 log paths; change them and
+the application config together when copying it. `#SBATCH` directives cannot expand `$variables`.
 
 ```bash
 mkdir -p output/experiment0/logs
-sbatch --clusters=wice scripts/slurm/job.slurm python -m <your_project_entrypoint>
+sbatch --clusters=wice --array=0-9 scripts/slurm/job.slurm "$PWD" "$PROJECT_ROOT" "$RUNTIME" "$REVISION" -m your_package.validate
+```
+
+The application must map `SLURM_ARRAY_TASK_ID` to unique work; the flag alone only repeats a
+command. **No `%N` throttle by default.** Slurm schedules all eligible work. Optional throttles
+require a user request or a proposed limit supported by measured storage/service/correctness
+evidence. Request appropriate resources per task; retain only genuine dependencies/gates.
+
+For more work than fits the site's submission ceiling, prepare a JSON list of **ready** `sbatch`
+argument lists, e.g. `config/experiment0/submissions.json`. An entry can represent one job or an
+array with task IDs below the verified MaxArraySize. Unthrottled arrays split automatically into
+available submission slots with original IDs preserved. Declare arrays in the plan; select work
+from stable IDs, not per-chunk array counts/min/max. Example shape (replace paths, revision,
+module and work selection):
+
+```json
+[
+  ["--array=0-9", "scripts/slurm/job.slurm", "/DATA/Project", "/PROJECT", "/PROJECT/Project/runtimes/runtime.sif", "COMMIT_SHA", "-m", "your_package.validate"]
+]
+```
+
+Preview, then run the same command with `--submit` after authorization:
+
+```bash
+python -m src.utils.submit_jobs config/experiment0/submissions.json --cluster wice --account ACCOUNT --qos QOS --site-submit-limit VERIFIED_LIMIT
+```
+
+Use a persistent submitter session. It fills available **pending+running** capacity, polls at
+60-second intervals when full/unavailable and refills automatically. The ceiling must match
+the selected user/account/QoS/cluster scope; verify broader limits too. Sequential submission
+RPCs preserve reliable receipts, not sequential job execution. Array `%N` is passed through
+only if deliberately present in the plan; such arrays wait for whole-array admission to preserve
+the requested throttle. Split oversized throttled arrays only after review. The helper adds no
+dependency or resource inflation.
+
+Receipts/locks live in `output/manifests/submissions/` and survive cleanup. Resume the same plan
+to skip accepted IDs. Never delete a receipt or clear an uncertain `in_flight` entry blindly:
+reconcile with `squeue`/`sacct` and record the accepted ID, or establish definite nonacceptance.
+Remove a stale submitter lock only after confirming its owner stopped. Changed plans need review;
+do not resubmit already accepted work under a new receipt. Generic QoS errors may mean invalid
+resources, not capacity, and stop for diagnosis. Failed queries never mean an empty queue.
+
+## Verify, publish and retire
+
+```bash
 squeue --clusters=all --me
-sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,AllocCPUS,TotalCPU,MaxRSS,ExitCode
-scancel --clusters=wice <jobid>
+sacctmgr show qos normal,long,debug,interactive format=Name,MaxSubmitJobsPerUser,MaxTRESPerUser
+scontrol --clusters=wice show config | grep MaxArraySize
+sacct --clusters=all -j JOB_ID --format=JobID,State,Elapsed,AllocCPUS,TotalCPU,MaxRSS,ExitCode
+sam-balance
+myquota
 ```
 
-The launcher starts with experiment-0 log paths. When copying it for another experiment or
-stage, change those paths and the application's config/experiment arguments together;
-Slurm does not expand shell variables in `#SBATCH` directives. Create the log folder first.
+Record queue/setup/compute/merge time, CPU/RAM/I/O use, source/runtime/config identities and
+validated outputs. Experiment 0 checks relevant behavior on VSC; local tests and exit codes
+alone are insufficient. Log every run/outcome in `AGENTS_MEMORY.md`.
 
-| Knob | Where | TODO |
-|---|---|---|
-| cluster | `--clusters` | `wice` or `mindwell`; use it explicitly for submission/cancellation |
-| partition | `#SBATCH --partition` | which partition this project uses |
-| CPU / RAM | `--cpus-per-task`, `--mem` | measured per-shard need, accounting for worker threads |
-| walltime | `#SBATCH --time` | realistic shard duration plus margin, within the partition limit |
-| array | `--array` | balanced shard IDs and useful concurrency, not sequential launches |
-| credits | `#SBATCH --account` | the credit account to charge |
-| GPUs | `#SBATCH --gpus-per-node` | what this project actually needs |
+Publish required results and checkpoints to PROJECT periodically and on completion, verify them,
+then update completion pointers. Resume only compatible complete state. Test signal forwarding,
+checkpoint acknowledgement and any requeue protocol before enabling it; the launcher supplies none.
+Required results must survive a killed job, failed node and scratch loss.
 
-When the job comes back, add its row to the Runs table in
-[`AGENTS_MEMORY.md`](AGENTS_MEMORY.md) — `done` / `walltime` / `OOM` / `crashed` / `diverged`, plus
-one line of notes.
+The launcher prints its unique scratch workspace and does not delete it. After publication,
+verify all expected files and confirm no active, queued or resumable job needs that workspace;
+then remove only that owned path. Track incomplete/recoverable work and regularly retire finished
+workspaces. Never rely on automatic purge or periodic touching. Node-local scratch is even less
+durable: the site may remove it at job end. Keep independent backups of irreplaceable results.
 
-## Outliving the walltime
-
-Any run that can exceed the limit must be **resumable** — a job killed at the walltime is
-otherwise a total loss.
-
-1. Checkpoint on a fixed interval to project storage, plus a small `state.json` on `$VSC_DATA`
-   naming the latest complete one. Write the pointer **last**, so a job killed mid-write points at
-   the previous complete checkpoint rather than a truncated one.
-2. On start, read the pointer and resume. A fresh run and a resumed run take the **same code
-   path** — a resume path only exercised after a crash is a resume path that does not work.
-3. Add requeue handling only after implementing and testing the application's checkpoint
-   protocol. `#SBATCH --signal=B:USR1@300` signals only the batch shell, not the application;
-   forwarding the request and confirming a complete checkpoint are the project's responsibility.
-   A fixed sleep is not confirmation. Requeue only after a successful checkpoint, with bounded
-   retries and a verified resume path. See the [Slurm signal documentation](https://slurm.schedmd.com/sbatch.html#OPT_signal).
-4. Make each step idempotent: a completed result is reused or replaced atomically, so a retry
-   never doubles a result file. Protect artifacts that cost a training run or paid call.
-
-The supplied job script does not automatically checkpoint or requeue. It runs the explicit
-compute command supplied after the script name and preserves its exit status.
-
-## Getting results back, and cleaning up
-
-Reports, logs and results are under `output/`; caches and checkpoints have separate roots.
+For local analysis, merge the DATA and PROJECT output trees by their relative paths without
+overwriting protected results. SCP/SFTP/rsync paths must be explicit; local PowerShell does not
+expand remote `$VSC_DATA`. Use approved transfer allocations for substantial copies.
 
 ```bash
-rsync -av vsc<number>@login.hpc.kuleuven.be:$VSC_DATA/{{PROJECT_NAME}}/output/ ./output/
+python -m src.utils.clean_run                     # preview disposable output across experiments
+python -m src.utils.clean_run --clean             # preserve results, receipts and workspaces
+python -m src.utils.clean_run --clean --processed # additionally rebuild processed inputs
 ```
 
-Each `output/<experiment>/results/` (including optional stage subfolders) is on project
-storage. Also copy that tier's `output/` into local `output/`, preserving relative paths
-and merging it with the personal-tier tree; do not replace one tree with the other.
-
-```bash
-python -m src.utils.clean_run                       # list what the previous run left
-python -m src.utils.clean_run --clean               # wipe ALL experiments on both tiers
-python -m src.utils.clean_run --clean --processed    # ...and the data/processed cache
-```
-
-The default cleanup targets generated `output/` on both tiers, across all experiments. `--processed` additionally
-targets `data/processed/`; raw data, checkpoints and library submodules are outside those
-targets. Stop writers before cleaning, preview before applying, and keep irreplaceable artifacts
-outside cleanup targets.
+Stop writers and retain useful logs first. Raw inputs, weights, runtimes, reusable caches and
+libraries stay protected. Scratch retirement always requires its separate checks above.

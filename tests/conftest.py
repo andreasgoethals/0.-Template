@@ -1,7 +1,4 @@
-"""Shared pytest setup.
-
-Two things, both so the suite behaves the same on a laptop, in CI and on a compute node.
-"""
+"""Run offline tests with isolated storage, source imports and headless figures."""
 
 from __future__ import annotations
 
@@ -12,8 +9,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# `from src...` without an editable install, so the suite runs on a fresh clone. A suite that
-# half-works depending on whether someone ran `pip install -e .` is a suite people stop trusting.
+# Fresh clones should not require an editable install to test source imports.
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -29,14 +25,20 @@ def _headless_matplotlib() -> None:
 
 @pytest.fixture
 def isolated_output(tmp_path, monkeypatch):
-    """Point every resolved path at `tmp_path` for the duration of one test.
-
-    Setting `VSC_DATA` and the staging override is how the cluster's own two-tier layout is
-    exercised off-cluster: `paths.on_vsc()` becomes true, so the test covers the branch that
-    only ever runs in production, which is otherwise the branch nobody tests.
-    """
+    """Exercise DATA/PROJECT/SCRATCH branches without touching real cluster storage."""
     from src.utils import paths
 
     monkeypatch.setenv("VSC_DATA", str(tmp_path / "vsc_data"))
     monkeypatch.setenv(paths.STAGING_ENV_VARS[0], str(tmp_path / "staging"))
+    monkeypatch.setenv("VSC_SCRATCH", str(tmp_path / "scratch"))
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def isolated_storage_environment(monkeypatch):
+    # Tests on VSC must never inherit real asset roots from the submission environment.
+    from src.utils import paths
+
+    for key in (*paths.PROJECT_ENV_VARS, *paths.STAGING_ENV_VARS, "VSC_DATA", "VSC_HOME",
+                "VSC_SCRATCH", "VSC_SCRATCH_NODE", "VSC_SCRATCH_GPFS1", "VSC_SCRATCH_LUSTRE1"):
+        monkeypatch.delenv(key, raising=False)

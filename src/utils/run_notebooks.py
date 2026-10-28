@@ -26,12 +26,13 @@ documents. A hard-coded list silently stops covering a notebook someone added.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 import tempfile
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -125,7 +126,7 @@ def _build_script(nb_path: Path, text_path: Path) -> str:
     return "".join(parts)
 
 
-def run_one(name: str, timeout: int = DEFAULT_TIMEOUT) -> NotebookResult:
+def run_one(name: str, timeout: int = DEFAULT_TIMEOUT, threads: int = 1) -> NotebookResult:
     """Execute one notebook in a fresh process; report execution failures."""
     started = time.time()
     nb_path = notebooks_dir() / f"{name}.ipynb"
@@ -150,6 +151,10 @@ def run_one(name: str, timeout: int = DEFAULT_TIMEOUT) -> NotebookResult:
             proc = subprocess.run(
                 [sys.executable, str(tmp)], cwd=str(REPO_ROOT),
                 capture_output=True, text=True, timeout=timeout, check=False,
+                env={**os.environ, **{key: str(threads) for key in (
+                    "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                    "BLIS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
+                )}, "OMP_MAX_ACTIVE_LEVELS": "1"},
             )
     except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
         write_text(failure_path, str(exc))
@@ -254,10 +259,24 @@ def write_all_results(notebooks: tuple[str, ...]) -> Path:
 # ---------------------------------------------------------------------------
 
 
+def worker_count(count: int, requested: int | None, threads: int) -> int:
+    """Use the available CPU budget, not a blanket notebook cap or another job's cores."""
+    cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1
+    if allocated := os.environ.get("SLURM_CPUS_PER_TASK"):
+        cpus = min(cpus, int(allocated))
+    if threads < 1 or threads > cpus:
+        raise ValueError(f"Notebook threads must be between 1 and the CPU budget ({cpus}).")
+    budget = cpus // threads
+    if requested is not None and (requested < 1 or requested > budget):
+        raise ValueError(f"--workers must be between 1 and the CPU budget ({budget}).")
+    return min(count, requested or budget)
+
+
 def run_all(
     notebooks: tuple[str, ...] | None = None,
     max_workers: int | None = None,
     timeout: int = DEFAULT_TIMEOUT,
+    threads: int = 1,
 ) -> list[NotebookResult]:
     """Run every notebook in parallel, then rebuild both summary documents.
 
@@ -267,13 +286,12 @@ def run_all(
     names = discover(notebooks)
     if not names:
         return []
-    # Capped at 4: notebooks are numpy-heavy and each already uses several threads, so more
-    # workers than this trades parallelism for cache thrashing.
-    workers = max_workers or min(len(names), 4)
+    workers = worker_count(len(names), max_workers, threads)
 
     results: list[NotebookResult] = []
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(run_one, name, timeout): name for name in names}
+    # Threads only supervise subprocesses; matplotlib still runs in a separate process per notebook.
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(run_one, name, timeout, threads): name for name in names}
         for fut in as_completed(futures):
             results.append(fut.result())
 
@@ -320,7 +338,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--only", nargs="+", metavar="ID",
                         help="paths relative to notebooks/, without .ipynb (use /)")
-    parser.add_argument("--workers", type=int, default=None, help="parallel processes")
+    parser.add_argument("--workers", type=int, default=None, help="optional lower concurrency")
+    parser.add_argument("--threads", type=int, default=1, help="numerical threads per notebook")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="seconds per notebook")
     parser.add_argument("--summaries-only", action="store_true",
                         help="rebuild both documents from disk, run nothing")
@@ -338,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(f"Running {len(names)} notebook(s): {', '.join(names)}")
-    results = run_all(names, max_workers=args.workers, timeout=args.timeout)
+    results = run_all(names, max_workers=args.workers, timeout=args.timeout, threads=args.threads)
     print(summarise(results))
     return 0 if all(r.ok for r in results) else 1
 
