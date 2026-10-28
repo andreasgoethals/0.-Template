@@ -13,7 +13,7 @@ The tiers differ in size and in convenience: `$VSC_DATA` is only 75 GiB but
 can be browsed directly, while project storage is large but has to be pulled down locally first
 (PowerShell, `scp`/`rsync`) before you can look at anything in it.
 
-`output/results/` is therefore the one part of `output/` on project storage: per-row predictions
+`output/<experiment>/results/` is the part of `output/` on project storage: per-row predictions
 reach gigabytes. Everything else stays where you can read it without a download, and project
 storage wants few big files rather than thousands of small ones anyway.
 
@@ -119,55 +119,68 @@ def _under(root: Path, *parts: str) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def outputs_dir() -> Path:
+def _relative_parts(name: str) -> tuple[str, ...]:
+    """Portable relative identifiers; reject aliases so two notebooks cannot own one folder."""
+    parts = tuple(name.split("/"))
+    if any(p in {"", ".", ".."} for p in parts) or "\\" in name or ":" in name:
+        raise ValueError("Use a relative identifier with / separators and no traversal.")
+    return parts
+
+
+def _contained(root: Path, *parts: str) -> Path:
+    folder = root.joinpath(*parts)
+    # A linked notebook folder must not let its cleanup delete another notebook's figures.
+    if folder.resolve() != root.resolve().joinpath(*parts):
+        raise ValueError("Output folder escapes its location through a link.")
+    return folder
+
+
+def outputs_dir(experiment: str | None = None) -> Path:
     """The personal-tier root for reports and logs; big results use results_dir().
 
     Locally `<repo>/output/`, on the cluster `$VSC_DATA/<Project>/output/`. One root means "what
     did this run produce?" and "what can I delete?" have one answer each.
     """
-    if on_vsc():
-        return _under(data_root(), "output")
-    return REPO_ROOT / "output"
+    root = _under(data_root(), "output") if on_vsc() else REPO_ROOT / "output"
+    return _contained(root, *_relative_parts(experiment)) if experiment is not None else root
 
 
-def results_dir(*parts: str) -> Path:
+def results_dir(*parts: str, experiment: str | None = None) -> Path:
     """Fine-grained results: one row per prediction, per-fold scores, anything large.
 
     THE ONE PART OF `output/` ON PROJECT STORAGE. A single sweep of per-row predictions would
     fill $VSC_DATA's 75 GiB, and then every job that writes a log also fails.
     """
-    if _use_staging():
-        return _under(staging_root(), "output", "results", *parts)
-    return outputs_dir().joinpath("results", *parts)
+    root = _under(staging_root(), "output") if _use_staging() else outputs_dir()
+    if experiment is not None:
+        root = _contained(root, *_relative_parts(experiment))
+    return root.joinpath("results", *parts)
 
 
-def logs_dir() -> Path:
+def logs_dir(experiment: str | None = None) -> Path:
     """Timestamped run logs. Small, many files -> `$VSC_DATA`, not the inode-poor tier."""
-    return outputs_dir() / "logs"
+    return outputs_dir(experiment) / "logs"
 
 
-def manifests_dir() -> Path:
+def manifests_dir(experiment: str | None = None) -> Path:
     """Per-run manifests: the small CSV/JSON record of what a run did."""
-    return outputs_dir() / "manifests"
+    return outputs_dir(experiment) / "manifests"
 
 
 def figures_dir(notebook: str | None = None) -> Path:
-    """`output/figures/`, or one notebook's own folder — a notebook clears its own before drawing
-    and must not be able to reach another's."""
-    root = outputs_dir() / "figures"
-    if notebook:
-        if Path(notebook).name != notebook or notebook in {".", ".."} or "\\" in notebook:
-            raise ValueError("Notebook identifiers must be plain file stems.")
-        folder = root / notebook
-        if folder.resolve().parent != root.resolve():
-            raise ValueError("Notebook folder escapes output/figures.")
-        return folder
-    return root
+    """Mirror a notebook's relative parent, then figures/<stem>; flat notebooks still work.
+
+    `experiment0/0a/report` owns `output/experiment0/0a/figures/report/`.
+    """
+    if notebook is None:
+        return outputs_dir() / "figures"
+    *parents, stem = _relative_parts(notebook)
+    return _contained(outputs_dir(), *parents, "figures", stem)
 
 
 def captions_path() -> Path:
     """The ONE shared captions file for every figure in the project."""
-    return figures_dir() / "CAPTIONS.md"
+    return outputs_dir() / "CAPTIONS.md"
 
 
 def all_results_path() -> Path:

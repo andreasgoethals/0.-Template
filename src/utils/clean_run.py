@@ -87,8 +87,8 @@ def wipe(root: Path) -> int:
 
     Two passes, and the order matters: files first, then empty directories bottom-up. That leaves
     exactly the directories holding a tracked `.gitkeep` and removes the per-run ones
-    (`figures/<notebook>/`) that do not. An `rmtree` of the subtree would take
-    `output/figures/.gitkeep` with it, and the next clone would have nowhere to write.
+    (`<experiment>/figures/<notebook>/`) that do not. An `rmtree` of the subtree would take
+    its `.gitkeep` markers with it, and the next clone would lose that structure.
     """
     entries = inventory(root)
     removed = 0

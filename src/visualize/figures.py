@@ -1,7 +1,10 @@
 """Saving figures. One folder per notebook, one PDF per figure, cleared before drawing.
 
-    output/figures/<notebook>/01_<name>.pdf     the figure — vector, for the paper
-    output/figures/<notebook>/_figures.json     what was drawn, in order, with captions
+    output/<experiment>/figures/<notebook>/01_<name>.pdf     vector, for the paper
+    output/<experiment>/figures/<notebook>/_figures.json     ordered captions
+
+Use the notebook's path relative to notebooks/, without .ipynb, as its identifier.
+For example, `experiment0/0a/report` mirrors its parents before `figures/report/`.
 
 PDF ONLY, AND SIZED FOR A4. The PDF is what the paper uses: vector, text embedded as TrueType so
 journal systems accept it, drawn at the width it will occupy on the A4 page (see
@@ -84,7 +87,7 @@ class FigureSaver:
 
         from src.visualize import figures, style
         style.apply()
-        save = figures.FigureSaver("example_analysis")   # clears its own folder here
+        save = figures.FigureSaver("experiment0/example_analysis")  # clears only its folder
 
         fig, ax = plt.subplots()
         ...

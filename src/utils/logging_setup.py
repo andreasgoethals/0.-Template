@@ -1,7 +1,7 @@
-"""One logger, configured once. Writes to the console and to `output/logs/`.
+"""One logger, configured once. Writes to the console and the experiment's logs/.
 
 Scheduler stdout follows the submission settings, including across requeues. A code-controlled
-`.log` under `output/logs/` gives each run a predictable debugging record.
+`.log` under `output/<experiment>/logs/` gives each run a predictable debugging record.
 
 WHY `force=True`: a notebook cell that calls this twice would
 otherwise attach a second handler and print every line twice — which reads like the code
@@ -26,20 +26,25 @@ _FORMAT = "%(asctime)s %(levelname)-7s %(name)-28s %(message)s"
 _DATEFMT = "%d-%m-%Y %H:%M:%S"
 
 
-def setup(level: str = "INFO", *, run_id: str | None = None, to_file: bool = True) -> Path | None:
+def setup(
+    level: str = "INFO", *, experiment: str | None = None,
+    run_id: str | None = None, to_file: bool = True,
+) -> Path | None:
     """Configure the root logger once. Returns the log file path, or None.
 
     `run_id` names the file so a sweep's points do not overwrite each other. Without one the
     timestamp is the name, which is enough for an interactive session.
+    Pass `experiment="experiment1"` (or `experiment0/0a`) to keep each study's logs together.
     """
     global _CONFIGURED
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
     path: Path | None = None
 
     if to_file:
-        logs_dir().mkdir(parents=True, exist_ok=True)
+        folder = logs_dir(experiment)
+        folder.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = logs_dir() / (f"{run_id}_{stamp}.log" if run_id else f"{stamp}.log")
+        path = folder / (f"{run_id}_{stamp}.log" if run_id else f"{stamp}.log")
         handlers.append(logging.FileHandler(path, encoding="utf-8"))
 
     logging.basicConfig(

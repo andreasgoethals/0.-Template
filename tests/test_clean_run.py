@@ -59,11 +59,28 @@ def test_gitkeep_is_never_counted(isolated_output) -> None:
 
 
 def test_both_storage_tiers_are_cleared_on_the_cluster(isolated_output) -> None:
-    """`output/results/` lives on project storage there, so clearing only `$VSC_DATA` would leave
-    the largest files behind."""
+    """All experiments on both tiers must be cleared, while checkpoints remain protected."""
+    from src.utils.paths import checkpoints_dir, logs_dir, results_dir
+
     roots = clean_run.roots()
     assert len(roots) == 2
     assert any("staging" in str(r) for r in roots)
+    victims = []
+    for experiment in ("experiment0/0a", "experiment1"):
+        for path in (
+            logs_dir(experiment) / "run.log",
+            results_dir("scores.csv", experiment=experiment),
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("generated")
+            victims.append(path)
+    checkpoint = checkpoints_dir("retained.bin")
+    checkpoint.parent.mkdir(parents=True)
+    checkpoint.write_text("expensive")
+    for root in roots:
+        clean_run.wipe(root)
+    assert all(not path.exists() for path in victims)
+    assert checkpoint.read_text() == "expensive"
 
 
 def test_processed_is_opt_in(isolated_output) -> None:

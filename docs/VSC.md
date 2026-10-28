@@ -12,6 +12,19 @@ How to run this project on the cluster. The authoritative cluster documentation 
 `vsc-library/` submodule — read it there and keep this file as *this project's* answer to it, not a
 copy. Fill in the `TODO`s before the first submission.
 
+## Experiments and validation
+
+Follow [the experiment guideline](TEMPLATE.md#experiments): matching experiment folders
+under `config/`, `notebooks/` and `output/`. `experiment0` validates this project's behavior
+on the target VSC environment before research runs; split into `0a`, `0b`, ... as useful.
+The synthetic example notebook checks reporting locally and does not certify VSC behavior.
+
+TODO: list validation stages, commands, coverage and pass criteria here, including relevant
+CPU/GPU execution, output checks, resources and recovery. Keep independent checks parallel;
+record the tested source/config/environment and evidence paths in each stage's manifests.
+Link outcomes from `AGENTS_MEMORY.md`; revalidate affected behavior after changes. Explain
+any deliberate layout deviation without moving existing results or breaking resume paths.
+
 ## Speed-first execution
 
 Follow [the speed-first policy in TEMPLATE.md](TEMPLATE.md#speed-first-execution-open-ondemand-and-slurm):
@@ -34,7 +47,7 @@ Record this project's measured choices here rather than inheriting arbitrary lim
 
 For ten independent shards, `--array=0-9%10` permits up to ten concurrent tasks. The entrypoint
 must read `SLURM_ARRAY_TASK_ID`; applying this flag to an unsharded command merely repeats it.
-Use distinct `.log` paths such as `output/logs/%x_%A_%a.log`, and separate shard outputs.
+Use distinct `.log` paths such as `output/experiment0/logs/%x_%A_%a.log`, and separate shard outputs.
 Use same-cluster `afterok` dependencies for preparation/merge; do not assume cross-cluster
 dependencies work. Query limits and inspect pending reasons with the commands in TEMPLATE.md.
 Do not choose a low concurrency cap merely to save credits, or a huge cap that slows shared I/O.
@@ -67,7 +80,7 @@ tiers to the repository root off-cluster, so the same code runs on a laptop unco
 
 | tier | path | holds | quota |
 |---|---|---|---|
-| **project storage** | `<configured staging root>/{{PROJECT_NAME}}/` | datasets, checkpoints, caches, **`output/results/`** | allocation-specific |
+| **project storage** | `<configured staging root>/{{PROJECT_NAME}}/` | datasets, checkpoints, caches, **`output/<experiment>/results/`** | allocation-specific |
 | **personal data** | `$VSC_DATA/{{PROJECT_NAME}}/` | the repository, and the rest of `output/` | 75 GiB |
 | scratch | `$VSC_SCRATCH/` | working scratch only | **purged after 30 days** |
 
@@ -112,12 +125,16 @@ The venv lives on `$VSC_DATA`: it must survive the scratch purge and be backed u
 ## Submitting
 
 ```bash
-mkdir -p output/logs
+mkdir -p output/experiment0/logs
 sbatch --clusters=wice scripts/slurm/job.slurm python -m <your_project_entrypoint>
 squeue --clusters=all --me
 sacct --clusters=all -j <jobid> --format=JobID,JobName,State,Elapsed,AllocCPUS,TotalCPU,MaxRSS,ExitCode
 scancel --clusters=wice <jobid>
 ```
+
+The launcher starts with experiment-0 log paths. When copying it for another experiment or
+stage, change those paths and the application's config/experiment arguments together;
+Slurm does not expand shell variables in `#SBATCH` directives. Create the log folder first.
 
 | Knob | Where | TODO |
 |---|---|---|
@@ -162,16 +179,17 @@ Reports, logs and results are under `output/`; caches and checkpoints have separ
 rsync -av vsc<number>@login.hpc.kuleuven.be:$VSC_DATA/{{PROJECT_NAME}}/output/ ./output/
 ```
 
-`output/results/` is on project storage, so it is a second copy from
-`<configured staging root>/{{PROJECT_NAME}}/output/results/`.
+Each `output/<experiment>/results/` (including optional stage subfolders) is on project
+storage. Also copy that tier's `output/` into local `output/`, preserving relative paths
+and merging it with the personal-tier tree; do not replace one tree with the other.
 
 ```bash
 python -m src.utils.clean_run                       # list what the previous run left
-python -m src.utils.clean_run --clean               # wipe output/ on both tiers
+python -m src.utils.clean_run --clean               # wipe ALL experiments on both tiers
 python -m src.utils.clean_run --clean --processed    # ...and the data/processed cache
 ```
 
-The default cleanup targets generated `output/` on both tiers. `--processed` additionally
+The default cleanup targets generated `output/` on both tiers, across all experiments. `--processed` additionally
 targets `data/processed/`; raw data, checkpoints and library submodules are outside those
 targets. Stop writers before cleaning, preview before applying, and keep irreplaceable artifacts
 outside cleanup targets.

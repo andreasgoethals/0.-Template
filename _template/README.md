@@ -38,6 +38,11 @@ Then fill in what a script cannot: `README.md` above its last chapter, the `TODO
 a similar project's `style.py` is the fastest start). Leave a `TODO` rather than a plausible guess:
 a wrong partition name fails at submit time, a `TODO` fails at read time.
 
+Use matching experiment folders in `config/`, `notebooks/` and `output/`; start with
+`experiment0` for VSC validation (optionally `0a`, `0b`, ...), then add research experiments.
+The included experiment-0 notebook is synthetic reporting, not a passed cluster test.
+See [the flexible guideline](../docs/TEMPLATE.md#experiments).
+
 ### `init_project.py`
 
 Replaces every `{{PLACEHOLDER}}` with a real value and prints the steps it deliberately does not
@@ -113,6 +118,6 @@ name, so `pip install -e .` fails here. Tests still run — `tests/conftest.py` 
 **After changing anything here**, initialise a throwaway copy and run it, rather than trusting that
 it still works.
 
-**Keep it project-agnostic.** No dataset, model, experiment or result anywhere. Several files under
+**Keep it project-agnostic.** No project-specific dataset, model, experiment or result. Several files under
 `src/` ship deliberately empty; fill them only with broadly useful defaults that projects
 can adapt.

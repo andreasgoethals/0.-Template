@@ -22,7 +22,7 @@ that configuration?"* is the question this table exists to answer.
 - **Run** — the config or arm, and the commit if it matters.
 - **Outcome** — `done` / `walltime` / `OOM` / `crashed` / `diverged` / `cancelled`.
 - **Notes** — one line: the headline number, the output path if it is worth finding again, or the
-  single thing the run showed. A number here saves re-reading `output/results/`.
+  single thing the run showed. A number here saves re-reading the experiment's results.
 
 ## Dead ends
 

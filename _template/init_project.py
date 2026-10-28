@@ -232,9 +232,9 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
      README.md          replace everything ABOVE the last chapter. Keep that chapter.
      docs/VSC.md        fill in the TODOs: partition, walltime, credit account.
      scripts/slurm/job.slurm    the same TODOs.
-     config/                    real configs; delete example.yaml.
+     config/experiment0/        VSC validation configs; replace example.yaml.
      src/visualize/style.py     define this project's shared plotting style.
-     notebooks/example_analysis.ipynb   the pattern to copy, then delete.
+     notebooks/experiment0/example_analysis.ipynb   replace the synthetic reporting example.
      docs/CHANGELOG.md          add the first project entry dated {values["DATE"]}.
 
   6. First commit

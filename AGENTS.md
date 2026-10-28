@@ -54,6 +54,11 @@ section of `docs/TEMPLATE.md`: measured resources, no duplicate work or shared-w
 approved budget and site limits. Explain necessary serial stages; this grants no permission
 to submit new work or change scientific protocols.
 
+Default to matching `experiment0`, `experiment1`, ... folders under `config/`, `notebooks/`
+and `output/`. Reserve experiment 0 for actual VSC validation, split into `0a`, `0b`, ...
+as useful. See [the experiment guideline](docs/TEMPLATE.md#experiments); document necessary
+deviations and preserve existing run evidence and resume paths.
+
 ## 5. Windows PowerShell 5.1 — no `&&`
 
 No `&&`, no ternary, no `??`. One command per line, or `;` with `if ($?) { ... }`:

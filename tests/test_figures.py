@@ -55,11 +55,15 @@ def test_the_folder_is_cleared_before_anything_is_drawn(isolated_output, fig) ->
     assert not (first.folder / "01_old.pdf").exists()
 
 
-def test_clearing_touches_only_this_notebook(isolated_output, fig) -> None:
+@pytest.mark.parametrize("a_name,b_name", [
+    ("nb_a", "nb_b"), ("experiment1/report", "experiment2/report"),
+    ("experiment0/0a/report", "experiment0/0b/report"),
+])
+def test_clearing_touches_only_this_notebook(isolated_output, fig, a_name, b_name) -> None:
     """A notebook deletes ITS OWN figures — never another notebook's."""
-    a = figures.FigureSaver("nb_a")
+    a = figures.FigureSaver(a_name)
     a(fig, "keep", caption="c")
-    figures.FigureSaver("nb_b")
+    figures.FigureSaver(b_name)
     assert (a.folder / "01_keep.pdf").is_file()
 
 

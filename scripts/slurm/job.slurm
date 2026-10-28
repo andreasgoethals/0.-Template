@@ -3,7 +3,7 @@
 # {{PROJECT_NAME}} — SLURM job template.
 #
 # Copy this per experiment; do not parameterise one script into unreadability.
-#   mkdir -p output/logs
+#   mkdir -p output/experiment0/logs
 #   sbatch --clusters=wice scripts/slurm/job.slurm python -m <your_project_entrypoint>
 #
 # THIS IS BASH ON LINUX, not PowerShell. `&&` is fine here.
@@ -11,6 +11,7 @@
 # Fill in the TODOs from docs/VSC.md before submitting; no resource size suits every project.
 # Use arrays for independent CPU shards; the entrypoint must select SLURM_ARRAY_TASK_ID.
 # For arrays, override log paths with %A_%a to make shard identity explicit.
+# Match the log paths and application's config/experiment arguments when copying this launcher.
 # ---------------------------------------------------------------------------
 #SBATCH --job-name={{PACKAGE_NAME}}
 #SBATCH --account=TODO_credit_account
@@ -24,9 +25,9 @@
 # Uncomment for a GPU partition:
 ##SBATCH --gpus-per-node=1
 
-# Submit from the repository root and create output/logs BEFORE sbatch opens these files.
-#SBATCH --output=output/logs/%x_%j.log
-#SBATCH --error=output/logs/%x_%j_error.log
+# Create this experiment's log folder BEFORE sbatch opens it; directives cannot expand $variables.
+#SBATCH --output=output/experiment0/logs/%x_%j.log
+#SBATCH --error=output/experiment0/logs/%x_%j_error.log
 #SBATCH --open-mode=append
 
 set -euo pipefail

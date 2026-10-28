@@ -2,6 +2,7 @@
 
 ## 28-10-2026
 
+- Add flexible experiment-first organization and staged VSC validation; support nested notebooks, isolated outputs and matching examples.
 - Make VSC turnaround speed the priority: shard independent CPU work, submit ready jobs together, and document OnDemand/Slurm limits and safe parallel execution.
 - Make all three library registration/update paths explicit; align the launcher and VSC setup with current site guidance.
 

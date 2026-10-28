@@ -4,7 +4,7 @@ How a project reads its configuration is project-specific: what the knobs are, w
 describes one run or a sweep, whether anything is validated. The template does not guess.
 
 What the template does ask: whatever you build here, a run should write the **fully resolved**
-configuration it used into `output/manifests/`. The YAML on disk may have been edited since, so
+configuration it used into `output/<experiment>/manifests/`. The YAML may have been edited since, so
 that copy is the only reliable answer to "what produced this result?".
 """
 

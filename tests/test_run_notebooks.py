@@ -1,5 +1,5 @@
-# Tests for report behavior — notebooks discovered alphabetically, and
-# `All_Results.md` sorted alphabetically with each block verbatim.
+# Tests for recursive discovery, experiment isolation and partial reruns; report blocks
+# remain verbatim and alphabetical by relative notebook path.
 """`src/utils/run_notebooks.py` — the runner and the two summary documents.
 
 The end-to-end test executes a real one-cell notebook in a subprocess. It is marked `slow`
@@ -41,9 +41,10 @@ def test_discovery_is_alphabetical(tmp_path, monkeypatch) -> None:
     stable — and discovered rather than listed, because a hard-coded list stops covering a
     notebook someone added."""
     monkeypatch.setattr(rn, "notebooks_dir", lambda: tmp_path)
-    for name in ("zeta", "alpha", "mid"):
+    for name in ("zeta", "experiment1/report", "experiment0/0a/report", "alpha"):
         make_notebook(tmp_path / f"{name}.ipynb", ["print(1)"])
-    assert rn.discover() == ("alpha", "mid", "zeta")
+    make_notebook(tmp_path / "experiment0/.ipynb_checkpoints/report.ipynb", ["print(1)"])
+    assert rn.discover() == ("alpha", "experiment0/0a/report", "experiment1/report", "zeta")
 
 
 def test_discovery_can_be_overridden_for_a_partial_rerun(tmp_path, monkeypatch) -> None:
@@ -186,17 +187,19 @@ def test_partial_rerun_keeps_other_notebooks_reports(isolated_output, monkeypatc
     monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
     # run_one still executes subprocesses; threads here let the discovery patch be shared.
     monkeypatch.setattr(rn, "ProcessPoolExecutor", ThreadPoolExecutor)
-    for name in ("a", "b"):
+    for name in ("experiment1/report", "experiment2/report"):
         make_notebook(nb_dir / f"{name}.ipynb", [f"print('summary {name}')"])
     assert all(r.ok for r in rn.run_all())
-    make_notebook(nb_dir / "a.ipynb", ["print('updated a')"])
-    assert all(r.ok for r in rn.run_all(("a",)))
+    make_notebook(nb_dir / "experiment1/report.ipynb", ["print('updated first')"])
+    assert all(r.ok for r in rn.run_all(("experiment1/report",)))
     text = rn.all_results_path().read_text()
-    assert "updated a" in text and "summary b" in text
+    assert "updated first" in text and "summary experiment2/report" in text
+    assert text.index("## experiment1/report") < text.index("## experiment2/report")
 
 
 @pytest.mark.slow
-def test_end_to_end_a_notebook_saves_its_own_figure(isolated_output, monkeypatch) -> None:
+@pytest.mark.parametrize("name", ["smoke", "experiment0/0a/smoke"])
+def test_end_to_end_a_notebook_saves_its_own_figure(isolated_output, monkeypatch, name) -> None:
     """The property the whole design rests on: the NOTEBOOK writes the files, so a runner
     execution and an interactive Run All produce the same thing.
 
@@ -211,30 +214,30 @@ def test_end_to_end_a_notebook_saves_its_own_figure(isolated_output, monkeypatch
     nb_dir = isolated_output / "notebooks"
     monkeypatch.setattr(rn, "notebooks_dir", lambda: nb_dir)
     make_notebook(
-        nb_dir / "smoke.ipynb",
+        nb_dir / f"{name}.ipynb",
         [
             "import sys\n"
             f"sys.path.insert(0, r{str(REPO_ROOT)!r})\n"
             "import matplotlib.pyplot as plt\n"
             "from src.visualize import figures, style\n"
             "style.apply()\n"
-            "save = figures.FigureSaver('smoke')\n"
+            f"save = figures.FigureSaver({name!r})\n"
             "fig, ax = plt.subplots(figsize=style.figsize(style.WIDTH_HALF))\n"
             "ax.plot([0, 1], [0, 1])\n"
             "save(fig, 'line', caption='A line from (0,0) to (1,1).')\n"
             "print('SMOKE SUMMARY: 1 figure')\n"
         ],
     )
-    result = rn.run_one("smoke")
+    result = rn.run_one(name)
     assert result.ok, result.error
     assert result.n_figures == 1
-    folder = figures_dir("smoke")
+    folder = figures_dir(name)
     assert (folder / "01_line.pdf").is_file()
     assert not list(folder.glob("*.png"))  # PDF only
 
     from src.utils.paths import all_results_path, captions_path
 
-    rn.write_captions(("smoke",))
-    rn.write_all_results(("smoke",))
+    rn.write_captions((name,))
+    rn.write_all_results((name,))
     assert "A line from (0,0) to (1,1)." in captions_path().read_text(encoding="utf-8")
     assert "SMOKE SUMMARY: 1 figure" in all_results_path().read_text(encoding="utf-8")

@@ -1,6 +1,5 @@
 # Tests for the template's default resolver; adapt them if the project changes storage policy.
-# and every other module trusts it. The interesting cases only happen on the cluster, so they are
-# forced with environment variables rather than left untested until a job hits them.
+# Exercise experiment isolation and both storage tiers without requiring a cluster.
 """`src/utils/paths.py` — the resolver. Tested because every other module trusts it.
 
 The interesting cases are the ones that only happen on the cluster, so they are forced with
@@ -82,7 +81,10 @@ def test_relative_override_uses_repo_not_cwd(monkeypatch, tmp_path):
     assert paths.staging_root() == paths.REPO_ROOT / "storage"
 
 
-@pytest.mark.parametrize("name", ["../escape", "nested/name", r"nested\name"])
+@pytest.mark.parametrize("name", [
+    "../escape", "experiment0/../report", r"nested\name", "/absolute", "C:/absolute",
+    "experiment0//report", "experiment0/./report", "", ".", "..",
+])
 def test_figure_folder_cannot_escape(name):
     with pytest.raises(ValueError):
         paths.figures_dir(name)
@@ -91,13 +93,38 @@ def test_figure_folder_cannot_escape(name):
 def test_figures_dir_is_per_notebook() -> None:
     root = paths.figures_dir()
     assert paths.figures_dir("some_notebook") == root / "some_notebook"
-    assert paths.captions_path() == root / "CAPTIONS.md"
+    assert paths.captions_path() == paths.outputs_dir() / "CAPTIONS.md"
     assert paths.all_results_path() == paths.outputs_dir() / "All_Results.md"
 
 
 def test_config_path_appends_the_suffix_once() -> None:
     assert paths.config_path("example").name == "example.yaml"
     assert paths.config_path("example.yaml").name == "example.yaml"
+
+
+@pytest.mark.parametrize("experiment", ["experiment1", "experiment0/0a"])
+@pytest.mark.parametrize("cluster", [False, True])
+def test_experiment_layout_on_both_tiers(tmp_path, monkeypatch, experiment, cluster):
+    monkeypatch.setattr(paths, "REPO_ROOT", tmp_path / "repo")
+    monkeypatch.delenv("VSC_DATA", raising=False)
+    for name in paths.STAGING_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    personal = staged = tmp_path / "repo" / "output"
+    if cluster:
+        monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+        monkeypatch.setenv(paths.STAGING_ENV_VARS[0], str(tmp_path / "project"))
+        personal = tmp_path / "data" / paths.PROJECT_NAME / "output"
+        staged = tmp_path / "project" / paths.PROJECT_NAME / "output"
+    assert paths.outputs_dir(experiment) == personal / experiment
+    assert paths.logs_dir(experiment) == personal / experiment / "logs"
+    assert paths.manifests_dir(experiment) == personal / experiment / "manifests"
+    assert paths.results_dir("scores.csv", experiment=experiment) == (
+        staged / experiment / "results" / "scores.csv"
+    )
+    assert paths.figures_dir(f"{experiment}/report") == personal / experiment / "figures/report"
+    assert paths.config_path(f"{experiment}/smoke") == (
+        paths.REPO_ROOT / "config" / experiment / "smoke.yaml"
+    )
 
 
 def test_data_search_paths_look_in_the_repo_first(tmp_path, monkeypatch) -> None:

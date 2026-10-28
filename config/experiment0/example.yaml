@@ -1,0 +1,5 @@
+# Illustrative only; replace with this project's VSC validation configs and loader.
+name: example
+seed: 42
+logging:
+  level: INFO

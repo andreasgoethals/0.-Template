@@ -1,5 +1,0 @@
-# Illustrative only: projects define their own schema and loader in src/utils/config.py.
-name: example
-seed: 42
-logging:
-  level: INFO
