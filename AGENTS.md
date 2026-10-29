@@ -20,6 +20,12 @@ deviations. Keep project decisions in project docs; keep instructions and commen
 
 ## VSC execution
 
+- Follow the development loop in `docs/TEMPLATE.md`: edit/test locally, review and push the
+  tested commit when authorized, then SSH pull into a safe DATA checkout and verify the revision.
+  Run extensive relevant VSC tests through Slurm; inspect logs, scheduler outcomes and artifacts
+  directly, fix locally and repeat. Record evidence and distinguish local from cluster acceptance.
+  Track temporary files/checkouts on all tiers and finish with verified, scoped cleanup; document
+  any deferred cleanup and its reason. Preserve active/queued/resumable consumers and retained assets.
 - Read TEMPLATE.md's VSC access workflow. The user runs `step ssh login --context VSC` and
   completes MFA; check actual certificate expiry. Never open/automate login or schedule reminders.
   If renewal is needed, ask for that command and wait. Access is shared only through the same

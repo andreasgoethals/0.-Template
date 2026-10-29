@@ -2,6 +2,7 @@
 
 ## 29-10-2026
 
+- Make the local-test/push/SSH-pull/VSC-test loop explicit, including direct evidence review and tracked cleanup of temporary work on every tier.
 - Document manual VSC access and direct agent inspection; require PROJECT dependency containers and deliberate scratch cleanup. Align onboarding/synchronization and remove conflicting CPU/memory launcher defaults per current Leuven guidance.
 
 ## 28-10-2026

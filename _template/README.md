@@ -22,6 +22,8 @@ python _template/init_project.py ProjectName --description "One sentence about t
 On VSC the checkout goes on DATA; persistent assets and **mandatory SIF dependency containers** go
 on PROJECT. Start access with the user-run `step ssh login --context VSC`; follow TEMPLATE.md's
 Windows setup, expiry check and bounded agent probe. No automated MFA or reminder scheduling.
+The normal loop is **edit/test locally → review/push → SSH pull on DATA → Slurm validation →
+inspect logs/results → publish and clean temporary work**; see TEMPLATE.md for gates and ownership checks.
 
 `init_project.py` substitutes project/package/author/date/URL placeholders, validating TOML and
 notebook JSON before writing. `--dry-run` previews. It skips libraries/assets/linked directories,

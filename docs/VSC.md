@@ -55,6 +55,28 @@ Native PROJECT assets may be read directly. Stage only needed cross-filesystem w
 verify copies and database locking before compute. Preserve original inputs and checkpoints.
 No cluster downloads, environment installs or migrations are authorized just by this template.
 
+## Deploy a locally tested revision
+
+Follow [the development loop](TEMPLATE.md#development-and-vsc-validation-loop). After local tests,
+review/commit/push; use the documented SSH stdin route for these remote Bash commands. First verify
+that the DATA checkout is clean, on the intended branch and unused by active/queued/resumable jobs;
+otherwise create a separate DATA checkout. Replace the commit placeholder with the published SHA:
+
+```bash
+set -eu
+cd "$VSC_DATA/{{PROJECT_NAME}}"
+git status --short --branch
+git pull --ff-only
+EXPECTED_COMMIT=COMMIT_SHA
+test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
+git submodule status
+```
+
+Then run this project's required cluster tests via Slurm using the recorded PROJECT container.
+Fill in test commands/coverage and pass criteria above; inspect logs, resource use and output
+integrity before accepting results. Fix locally and redeploy. Track created temporary paths and
+record their cleanup or justified deferral after the publication/ownership checks below.
+
 ## Submit independent work
 
 Fill `scripts/slurm/job.slurm` resource/Apptainer-module TODOs first. It requires a PROJECT SIF,
