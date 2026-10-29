@@ -210,7 +210,7 @@ Windows PowerShell — ONE COMMAND PER LINE, `&&` is a parser error there.
 
      Remove-Item -Recurse -Force _template
 
-  2. Local environment (cluster runtimes go on PROJECT; see docs/VSC.md)
+  2. Local environment (VSC dependencies must be in PROJECT SIF containers; see docs/VSC.md)
 
      python -m venv .venv
      .\\.venv\\Scripts\\Activate.ps1

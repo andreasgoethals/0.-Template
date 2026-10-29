@@ -19,8 +19,9 @@ python _template/init_project.py ProjectName --description "One sentence about t
    the synthetic notebook only demonstrates reporting. Optional TFM/DM setup is in TEMPLATE.md.
 5. Run `python -m pytest -q`, `python -m ruff check .` and `python -m src.utils.run_notebooks`.
 
-On VSC the Git checkout goes on DATA; environments/images and persistent assets go on PROJECT.
-Prefer compact immutable containers. Read the storage/concurrency policy before staging or submitting.
+On VSC the checkout goes on DATA; persistent assets and **mandatory SIF dependency containers** go
+on PROJECT. Start access with the user-run `step ssh login --context VSC`; follow TEMPLATE.md's
+Windows setup, expiry check and bounded agent probe. No automated MFA or reminder scheduling.
 
 `init_project.py` substitutes project/package/author/date/URL placeholders, validating TOML and
 notebook JSON before writing. `--dry-run` previews. It skips libraries/assets/linked directories,
@@ -42,3 +43,6 @@ After approved edits, align docs and run relevant tests; distinguish local check
 
 Keep the template generic and concise. Submodule maintenance belongs in the canonical libraries;
 propagating TEMPLATE.md alone does not migrate downstream code or storage.
+For updates, use [Receiving template updates](../docs/TEMPLATE.md#receiving-template-updates):
+publish the canonical change, copy this one document to selected consumers, compare hashes and
+commit/push with authorization. This is separate from library-pin updates and never changes campaigns.

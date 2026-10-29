@@ -147,7 +147,7 @@ def checkpoints_dir(*parts: str) -> Path:
 
 
 def runtimes_dir(*parts: str) -> Path:
-    """Versioned SIF images or unpacked project environments, outside Git."""
+    """Versioned PROJECT SIF images containing dependencies, outside Git."""
     return _asset("runtimes", *parts)
 
 

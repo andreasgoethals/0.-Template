@@ -20,14 +20,24 @@ deviations. Keep project decisions in project docs; keep instructions and commen
 
 ## VSC execution
 
+- Read TEMPLATE.md's VSC access workflow. The user runs `step ssh login --context VSC` and
+  completes MFA; check actual certificate expiry. Never open/automate login or schedule reminders.
+  If renewal is needed, ask for that command and wait. Access is shared only through the same
+  local Windows account's configured agent, not automatically with cloud/other machines.
+- Inspect relevant VSC files, logs, results, quotas and jobs directly after the bounded read-only
+  check. Use native Windows `ssh.exe -T` with LF stdin/no remote command for the observed gateway
+  issue; verify output/errors, keep host-key checks and timeouts, and distinguish auth/network/command
+  failures. Computational debugging uses authorized Slurm resources; access expands no task permissions.
 - DATA holds the actual Git checkout, specifications and compact logs. Preserve revisions/pins
   used by active or queued jobs. Clone/pull/update submodules here, never in a scratch working copy.
-- PROJECT holds persistent assets and project runtimes; prefer versioned immutable containers
-  containing the environment. Recreate from recorded specifications at the destination and validate
-  before retiring originals. No large-asset fallback to DATA. Check byte/file quotas and backups.
+- PROJECT holds persistent assets; **all project dependencies must be inside versioned SIF containers**
+  because file counts are strictly limited. Rebuild for the destination and validate architecture,
+  modules/drivers and dependencies before retiring originals. No unpacked cluster venv/Conda trees
+  or DATA fallback. Check byte/file quotas and independent backups; local laptop venvs are allowed.
 - SCRATCH is disposable job work, never the sole copy of important files. Publish periodically
   and at completion; retire only verified owned workspaces no active/queued/resumable job needs.
-  Track failed work for recovery and keep scratch tidy deliberately, not through automatic purge.
+  Keep both GPFS and Lustre project scratch free of obsolete workspaces and empty between workloads
+  when no job/recovery needs it. Never wipe shared roots or rely on automatic purge.
 - Native GPFS for intensive Mindwell I/O, Lustre for wICE. Direct native PROJECT reads are fine;
   stage only what is necessary. Isolate/lock writable databases and verify publication.
 - Optimize time to verified results, not tokens or minimum credits, within the approved budget.

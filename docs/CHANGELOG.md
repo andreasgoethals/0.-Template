@@ -1,5 +1,9 @@
 # Changelog
 
+## 29-10-2026
+
+- Document manual VSC access and direct agent inspection; require PROJECT dependency containers and deliberate scratch cleanup. Align onboarding/synchronization and remove conflicting CPU/memory launcher defaults per current Leuven guidance.
+
 ## 28-10-2026
 
 - Establish DATA/PROJECT/SCRATCH policy, PROJECT runtimes and protected retained results; remove fallback storage and arbitrary concurrency defaults, add resumable site-capacity submission, and compact the docs.
