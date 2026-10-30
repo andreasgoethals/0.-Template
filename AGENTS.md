@@ -26,8 +26,12 @@ deviations. Keep project decisions in project docs; keep instructions and commen
   directly, fix locally and repeat. Record evidence and distinguish local from cluster acceptance.
   Track temporary files/checkouts on all tiers and finish with verified, scoped cleanup; document
   any deferred cleanup and its reason. Preserve active/queued/resumable consumers and retained assets.
+- Use one branch (normally `main`) locally/GitHub/VSC; preserve an existing project's branch.
+  Protect active revisions without creating feature/test branches. For long waits, use an optional
+  temporary 30-minute progress monitor per TEMPLATE.md; assess logs/accounting/artifacts and delete
+  the monitor after reporting terminal outcomes. Monitoring grants no new execution permissions.
 - Read TEMPLATE.md's VSC access workflow. The user runs `step ssh login --context VSC` and
-  completes MFA; check actual certificate expiry. Never open/automate login or schedule reminders.
+  completes MFA; check actual certificate expiry. Never open/automate login or schedule authentication reminders.
   If renewal is needed, ask for that command and wait. Access is shared only through the same
   local Windows account's configured agent, not automatically with cloud/other machines.
 - Inspect relevant VSC files, logs, results, quotas and jobs directly after the bounded read-only

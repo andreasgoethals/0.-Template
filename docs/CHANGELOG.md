@@ -1,5 +1,9 @@
 # Changelog
 
+## 30-10-2026
+
+- Clarify single-branch deployment, manual access renewal and temporary 30-minute progress monitoring; rewrite the VSC runbook in workflow order.
+
 ## 29-10-2026
 
 - Make the local-test/push/SSH-pull/VSC-test loop explicit, including direct evidence review and tracked cleanup of temporary work on every tier.
