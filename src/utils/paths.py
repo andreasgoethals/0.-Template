@@ -13,6 +13,7 @@ from pathlib import Path
 PROJECT_NAME = "{{PROJECT_NAME}}"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ENV_VARS = ("{{PROJECT_UPPER}}_PROJECT_ROOT", "VSC_PROJECT_ROOT")
+EXECUTION_ENV_VARS = ("{{PROJECT_UPPER}}_EXECUTION_ROOT", "VSC_EXECUTION_ROOT")
 # Accept existing configuration without silently moving a project's assets.
 STAGING_ENV_VARS = ("{{PROJECT_UPPER}}_STAGING_ROOT", "VSC_STAGING_ROOT")
 
@@ -60,6 +61,24 @@ def project_root() -> Path:
 def staging_root() -> Path:
     """Compatibility name for project_root(); not a temporary staging area."""
     return project_root()
+
+
+def execution_root() -> Path:
+    """Full project/job working directory; default to durable assets, never choose a filesystem."""
+    root = next((path for name in EXECUTION_ENV_VARS if (path := _env_path(name))), None)
+    if root is None:
+        return _asset()
+    if on_vsc():
+        for protected in (REPO_ROOT, _env_path("VSC_DATA"), _env_path("VSC_HOME")):
+            if protected is not None and (root.resolve().is_relative_to(protected.resolve())
+                    or protected.resolve().is_relative_to(root.resolve())):
+                raise ValueError("Execution assets must be separate from checkout/DATA/HOME.")
+    return root
+
+
+def execution_dir(*parts: str) -> Path:
+    """Explicit working files only; publication to durable helpers is the project's responsibility."""
+    return _contained(execution_root(), *parts)
 
 
 def data_root() -> Path:
@@ -207,5 +226,5 @@ def resolve_writable(preferred: Path) -> Path:
 def describe() -> dict[str, str]:
     return {"project": PROJECT_NAME, "on_vsc": str(on_vsc()), "repo_root": str(REPO_ROOT),
             **{f.__name__: str(f()) for f in (
-                project_root, data_root, scratch_root, outputs_dir, results_dir, runtimes_dir,
+                project_root, execution_root, data_root, scratch_root, outputs_dir, results_dir, runtimes_dir,
             )}}

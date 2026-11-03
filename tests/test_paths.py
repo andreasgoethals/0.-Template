@@ -1,5 +1,5 @@
 # Tests for the template's default resolver; adapt them if the project changes storage policy.
-# Exercise experiment isolation and both storage tiers without requiring a cluster.
+# Exercise durable/execution separation and experiment isolation without a cluster.
 """`src/utils/paths.py` — the resolver. Tested because every other module trusts it.
 
 The interesting cases are the ones that only happen on the cluster, so they are forced with
@@ -195,3 +195,52 @@ def test_relative_project_root_is_rejected_on_vsc(isolated_output, monkeypatch):
     monkeypatch.setenv(paths.PROJECT_ENV_VARS[0], "relative")
     with pytest.raises(ValueError, match="absolute"):
         paths.project_root()
+
+
+@pytest.mark.parametrize("filesystem", ["lustre", "gpfs"])
+def test_durable_choice_is_explicit_and_execution_does_not_redirect_it(tmp_path, monkeypatch, filesystem):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+    durable = tmp_path / filesystem / "allocation"
+    other = tmp_path / ("gpfs" if filesystem == "lustre" else "lustre") / "allocation"
+    monkeypatch.setenv(paths.PROJECT_ENV_VARS[0], str(durable))
+    monkeypatch.setenv("VSC_PROJECT_GPFS1", str(other))
+    monkeypatch.setenv("VSC_PROJECT_LUSTRE1", str(other))
+    assert paths.execution_root() == durable / paths.PROJECT_NAME
+    work = tmp_path / "native-scratch/job-123"
+    monkeypatch.setenv(paths.EXECUTION_ENV_VARS[0], str(work))
+    assert paths.execution_dir("data/raw") == work / "data/raw"
+    assert paths.raw_dir() == durable / paths.PROJECT_NAME / "data/raw"
+    assert paths.results_dir().is_relative_to(durable)
+    assert paths.runtimes_dir().is_relative_to(durable)
+    with pytest.raises(ValueError):
+        paths.execution_dir("../escape")
+
+
+def test_execution_override_keeps_workstation_defaults(monkeypatch):
+    assert paths.execution_root() == paths.REPO_ROOT
+    monkeypatch.setenv(paths.EXECUTION_ENV_VARS[0], "working")
+    assert paths.execution_root() == paths.REPO_ROOT / "working"
+    assert paths.results_dir() == paths.REPO_ROOT / "output/results"
+
+
+@pytest.mark.parametrize("location", ["VSC_DATA", "VSC_HOME"])
+def test_cluster_execution_rejects_small_storage(tmp_path, monkeypatch, location):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv(location, str(tmp_path / location))
+    monkeypatch.setenv(paths.EXECUTION_ENV_VARS[0], str(tmp_path / location / "job"))
+    with pytest.raises(ValueError, match="separate"):
+        paths.execution_root()
+
+
+def test_site_project_mounts_do_not_choose_authority(tmp_path, monkeypatch):
+    monkeypatch.setenv("VSC_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("VSC_PROJECT_GPFS1", str(tmp_path / "gpfs"))
+    monkeypatch.setenv("VSC_PROJECT_LUSTRE1", str(tmp_path / "lustre"))
+    with pytest.raises(ValueError, match="allocated"):
+        paths.project_root()
+
+
+def test_cluster_execution_requires_absolute_override(isolated_output, monkeypatch):
+    monkeypatch.setenv(paths.EXECUTION_ENV_VARS[0], "relative")
+    with pytest.raises(ValueError, match="absolute"):
+        paths.execution_root()

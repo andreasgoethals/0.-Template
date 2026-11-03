@@ -50,6 +50,10 @@ deviations. Keep project decisions in project docs; keep instructions and commen
   when no job/recovery needs it. Never wipe shared roots or rely on automatic purge.
 - Native GPFS for intensive Mindwell I/O, Lustre for wICE. Direct native PROJECT reads are fine;
   stage only what is necessary. Isolate/lock writable databases and verify publication.
+- Select durable PROJECT authority per project (Lustre or GPFS) in private deployment settings;
+  keep execution working roots separate. No automatic filesystem switching or permanent duplicate
+  trees. Migrations need consumer/database/permission/checksum checks, validated resume/publication
+  and rollback protection before retiring old copies. Document necessary project exceptions.
 - Optimize time to verified results, not tokens or minimum credits, within the approved budget.
   Submit independent ready jobs together without default `%N` throttles, application pools or
   serialization dependencies. Preserve real preparation/validation/producer-consumer dependencies.

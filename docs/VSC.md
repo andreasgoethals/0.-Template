@@ -13,7 +13,8 @@ Check its [review flags](../vsc-library/UPSTREAM_CHANGES.md) and
 | Single branch | `main`, or the project's established branch; use the same locally/GitHub/VSC |
 | SSH route and verified host key | TODO; actual username stays in private local configuration |
 | DATA checkout and frozen revision/pins | TODO; include consumers that prevent updating it |
-| Shared PROJECT root per cluster | TODO; native GPFS for Mindwell, Lustre for wICE |
+| Authoritative durable PROJECT root | TODO; choose allocated Lustre or GPFS, not inferred from cluster |
+| Execution working root per cluster/job | TODO; native GPFS for Mindwell, Lustre for wICE; direct or staged |
 | Container definition/lock, SIF hash, architecture/modules/driver | TODO; tested PROJECT image |
 | Cluster, partition, account, QoS | TODO; verify live settings and approved resources |
 | Per-task CPUs, memory, GPUs, walltime | TODO; measure requirements and startup/publication margin |
@@ -79,7 +80,7 @@ test -z "$(git status --porcelain)"
 git pull --ff-only
 test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
 git submodule status
-PROJECT_ROOT=/allocated/native/shared/root
+PROJECT_ROOT=/allocated/selected/durable/root
 RUNTIME="$PROJECT_ROOT/{{PROJECT_NAME}}/runtimes/runtime-v1.sif"
 REVISION=$(git rev-parse HEAD)
 ```
@@ -105,6 +106,20 @@ working sets. Verify transfers and isolate/lock writable databases. Never silent
 Set `VSC_PROJECT_ROOT` or `{{PROJECT_UPPER}}_PROJECT_ROOT` to a shared root; the resolver appends the
 project name once. Legacy `*_STAGING_ROOT` aliases remain supported. Record backups separately from
 storage lifetime; do not assume PROJECT protection. `myquota` and allocation-specific tools check quotas.
+
+Both Lustre PROJECT and GPFS PROJECT remain persistent options. Store this project's authority and
+allocation in private/ignored deployment settings; `.env.local` is not sourced automatically.
+Public examples are `/lustre1/project/ALLOCATION` and `/gpfs1/project/ALLOCATION`. Do not keep permanent
+duplicate project trees by default; independent backup/outflow remains required.
+
+For staged execution, explicitly set `{{PROJECT_UPPER}}_EXECUTION_ROOT` or `VSC_EXECUTION_ROOT` to
+the **full job/project working directory**, then use `execution_dir(...)` for staged files. Unlike
+the shared durable root, no project suffix is added. Durable helpers keep their original meaning.
+Verify only necessary staged inputs/runtime, isolate writers, publish retained outputs periodically
+and finally, then retire obsolete owned working copies after verification and consumer checks.
+wICE P100/V100 cannot access GPFS: stage before compute and publish via a node that can see both
+filesystems. The stock launcher needs durable-root visibility; adapt its binds, staged runtime,
+explicit container environment and transfer dependencies for inaccessible roots. It performs no staging.
 
 ## 6. Validate on VSC and submit independent work
 
@@ -187,3 +202,14 @@ python -m src.utils.clean_run --clean --processed # explicitly rebuild processed
 Stop writers and retain useful logs first. These commands do not retire scratch workspaces or delete
 raw inputs, checkpoints, runtimes, reusable caches or libraries. Report local checks and actual VSC
 acceptance separately, including remaining failures, deferred cleanup and monitor removal.
+
+## 9. Change durable storage only through an accepted migration
+
+Plan separately with authorization: inventory jobs/resume consumers, databases, locks, links, quotas
+and permissions; agree a safe cutover. Snapshot databases consistently rather than copying live files.
+Verify checksums and required links; review destination group/ACL access before exposing private data.
+Update private roots, runtime pointers, binds and validation rules while preserving historical receipts.
+Run bounded target-node execution, resume and periodic/final publication checks. Preserve rollback
+copies until acceptance, independent recovery copies and absence of old-path consumers are verified;
+then retire only scoped obsolete copies. Record justified project-specific exceptions. A new allocation
+or a template-document update does not authorize migration or change an active campaign.

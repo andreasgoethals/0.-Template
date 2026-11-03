@@ -25,6 +25,8 @@ Windows setup, expiry check and bounded agent probe. No automated MFA or authent
 Use one branch (normally `main`): **edit/test locally → review/push → SSH pull on DATA → Slurm
 validation → inspect results → publish/clean**. TEMPLATE.md covers gates, ownership and optional
 temporary 30-minute monitors for long waits; those monitors delete themselves after reporting outcomes.
+Choose Lustre or GPFS PROJECT authority per project in private deployment settings; distinguish
+durable assets from native execution work. TEMPLATE.md covers staging, migration acceptance and rollback.
 
 `init_project.py` substitutes project/package/author/date/URL placeholders, validating TOML and
 notebook JSON before writing. `--dry-run` previews. It skips libraries/assets/linked directories,

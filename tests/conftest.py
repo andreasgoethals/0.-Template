@@ -39,6 +39,6 @@ def isolated_storage_environment(monkeypatch):
     # Tests on VSC must never inherit real asset roots from the submission environment.
     from src.utils import paths
 
-    for key in (*paths.PROJECT_ENV_VARS, *paths.STAGING_ENV_VARS, "VSC_DATA", "VSC_HOME",
+    for key in (*paths.PROJECT_ENV_VARS, *paths.EXECUTION_ENV_VARS, *paths.STAGING_ENV_VARS, "VSC_DATA", "VSC_HOME",
                 "VSC_SCRATCH", "VSC_SCRATCH_NODE", "VSC_SCRATCH_GPFS1", "VSC_SCRATCH_LUSTRE1"):
         monkeypatch.delenv(key, raising=False)

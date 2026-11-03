@@ -1,5 +1,9 @@
 # Changelog
 
+## 03-11-2026
+
+- Support project-selected Lustre/GPFS durable storage with separate execution roots; document staging, migration acceptance, permissions and rollback without automatic data moves.
+
 ## 30-10-2026
 
 - Clarify single-branch deployment, manual access renewal and temporary 30-minute progress monitoring; rewrite the VSC runbook in workflow order.
